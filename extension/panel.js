@@ -43,9 +43,9 @@ function mdRich(s) {
       html += t;
       continue;
     }
-    if (/^\s*$/.test(raw)) { closeList(); continue; }
-    if (/^#{1,4}\s/.test(raw)) { closeList(); html += `<div class="md-h">${inline(raw.replace(/^#{1,4}\s*/, ''))}</div>`; continue; }
-    if (/^\s*[-•*]\s+/.test(raw)) { if (!inList) { html += '<div class="md-list">'; inList = true; } html += `<div class="md-li">${inline(raw.replace(/^\s*[-•*]\s+/, ''))}</div>`; continue; }
+    if (/^\s*$/.test(raw)) { closeList(); i++; continue; }
+    if (/^#{1,4}\s/.test(raw)) { closeList(); html += `<div class="md-h">${inline(raw.replace(/^#{1,4}\s*/, ''))}</div>`; i++; continue; }
+    if (/^\s*[-•*]\s+/.test(raw)) { if (!inList) { html += '<div class="md-list">'; inList = true; } html += `<div class="md-li">${inline(raw.replace(/^\s*[-•*]\s+/, ''))}</div>`; i++; continue; }
     closeList();
     html += `<div class="md-p">${inline(raw)}</div>`;
     i++;
