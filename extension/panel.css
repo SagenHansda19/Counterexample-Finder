@@ -99,6 +99,11 @@ pre.codeblock {
 .md-li::before { content: '•'; position: absolute; left: 4px; color: #6d5cff; }
 code { background: #0a0d18; border: 1px solid #272d4a; border-radius: 5px; padding: 0 4px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; color: #b8c2ff; }
 .exp-label { font-size: 11px; letter-spacing: .05em; color: #9aa0c0; margin: 6px 0 2px; }
+.md-code { white-space: pre; word-break: normal; overflow-x: auto; margin: 8px 0; }
+.md-table { border-collapse: collapse; margin: 8px 0; width: 100%; font-size: 12px; }
+.md-table th, .md-table td { border: 1px solid #272d4a; padding: 5px 8px; text-align: left; vertical-align: top; }
+.md-table th { background: #161b30; color: #c9cdec; }
+.md-table tr:nth-child(even) td { background: #0e1120; }
 
 /* Test cases */
 .cases-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

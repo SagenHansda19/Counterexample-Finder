@@ -6,23 +6,50 @@ let lastCodeKey = '';
 
 /* ---------- small helpers ---------- */
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function splitRow(line) { return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()); }
 function md(s) {
   if (!s) return '';
   const lines = String(s).split('\n');
-  let html = '', inList = false;
+  let html = '', i = 0;
+  let inList = false;
+  const closeList = () => { if (inList) { html += '</div>'; inList = false; } };
   const inline = (t) => esc(t)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
-  for (const raw of lines) {
-    const line = raw;
-    if (/^\s*$/.test(line)) { if (inList) { html += '</div>'; inList = false; } continue; }
-    if (/^#{1,4}\s/.test(line)) { if (inList) { html += '</div>'; inList = false; } html += `<div class="md-h">${inline(line.replace(/^#{1,4}\s*/, ''))}</div>`; continue; }
-    if (/^\s*[-•*]\s+/.test(line)) { if (!inList) { html += '<div class="md-list">'; inList = true; } html += `<div class="md-li">${inline(line.replace(/^\s*[-•*]\s+/, ''))}</div>`; continue; }
-    if (inList) { html += '</div>'; inList = false; }
-    html += `<div class="md-p">${inline(line)}</div>`;
+  while (i < lines.length) {
+    const raw = lines[i];
+    // fenced code block
+    const fence = raw.match(/^\s*```(.*)$/);
+    if (fence) {
+      closeList();
+      const lang = (fence[1] || '').trim();
+      const buf = []; i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      i++; // skip closing fence
+      html += `<pre class="codeblock md-code">${esc(buf.join('\n'))}</pre>`;
+      continue;
+    }
+    // GFM table (header row + |---| separator)
+    if (/^\s*\|.*\|\s*$/.test(raw) && i + 1 < lines.length && /^\s*\|[\s:\-|]+\|\s*$/.test(lines[i + 1])) {
+      closeList();
+      const header = splitRow(raw); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(splitRow(lines[i])); i++; }
+      let t = '<table class="md-table"><thead><tr>' + header.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>';
+      for (const r of rows) t += '<tr>' + r.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>';
+      t += '</tbody></table>';
+      html += t;
+      continue;
+    }
+    if (/^\s*$/.test(raw)) { closeList(); continue; }
+    if (/^#{1,4}\s/.test(raw)) { closeList(); html += `<div class="md-h">${inline(raw.replace(/^#{1,4}\s*/, ''))}</div>`; continue; }
+    if (/^\s*[-•*]\s+/.test(raw)) { if (!inList) { html += '<div class="md-list">'; inList = true; } html += `<div class="md-li">${inline(raw.replace(/^\s*[-•*]\s+/, ''))}</div>`; continue; }
+    closeList();
+    html += `<div class="md-p">${inline(raw)}</div>`;
+    i++;
   }
-  if (inList) html += '</div>';
+  closeList();
   return html;
 }
 function setStatus(id, text) { $(id).innerHTML = text ? `<span class="spinner"></span><span>${esc(text)}</span>` : ''; }
