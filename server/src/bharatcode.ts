@@ -58,8 +58,8 @@ class BharatCodeClient {
   private readonly maxRetries: number;
 
   constructor(private readonly opts: BharatCodeClientOptions) {
-    this.baseUrl = (opts.baseUrl ?? 'https://bharatcode.ai/api/model/v1').replace(/\/$/, '');
-    this.model = opts.model ?? 'qwen-3.8-27b';
+    this.baseUrl = (opts.baseUrl ?? 'https://api.prod.adaptionlabs.ai/api/v1').replace(/\/$/, '');
+    this.model = opts.model ?? 'qwen3.8-27b';
     this.timeoutMs = opts.timeoutMs ?? 180_000;
     this.maxRetries = opts.maxRetries ?? 5;
   }
