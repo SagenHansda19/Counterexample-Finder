@@ -12,6 +12,7 @@ function md(s) {
   let html = '', inList = false;
   const inline = (t) => esc(t)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
   for (const raw of lines) {
     const line = raw;
@@ -39,7 +40,7 @@ function effProblem() {
 }
 function effCode() { return pageData.code || ''; }
 function needCode() { if (!effCode()) { setStatus('verify-status', ''); toast('No code detected — write some in the LeetCode editor'); return false; } return true; }
-function transcriptionNote() { const raw = effCode(); if (/function\s*\w*\s*\(|=>/.test(raw)) return ''; return '<div class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (same logic &amp; bug kept).</div>'; }
+function transcriptionNote() { return ''; }
 
 /* ---------- page reading + auto refresh ---------- */
 async function extractFromPage() {
@@ -168,20 +169,22 @@ $('btn-cases').addEventListener('click', async () => {
     setStatus('cases-status', 'Running tests…');
     const r = await callOp({ op: 'run', artifact, seed: (Date.now() % 999983) >>> 0 });
     if (!r.testCases || !r.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; setStatus('cases-status', ''); return; }
+    const names = (artifact.paramNames && artifact.paramNames.length) ? artifact.paramNames : (r.testCases[0].input || []).map((_, i) => 'arg' + i);
+    const dispInput = (input) => (input || []).map((arg, i) => (names[i] || ('arg' + i)) + ' = ' + JSON.stringify(arg)).join('\n');
+    const rawInput = (input) => (input || []).map((arg) => JSON.stringify(arg)).join('\n');
     const items = r.testCases.map((tc, i) => {
-      const payload = 'Input:  ' + JSON.stringify(tc.input) + '\nExpected: ' + JSON.stringify(tc.expected);
+      const payload = rawInput(tc.input);
       return `
       <div class="case-item">
-        <div class="case-top"><span class="case-idx">Test #${i + 1}</span><button class="mini" data-copy='${esc(payload).replace(/'/g, '&#39;')}'>⧉ Copy</button></div>
-        <div class="kv">
-          <div class="k">input</div><pre class="codeblock">${esc(JSON.stringify(tc.input))}</pre>
-          <div class="k">expected</div><pre class="codeblock good">${esc(JSON.stringify(tc.expected))}</pre>
-        </div>
+        <div class="case-top"><span class="case-idx">Case ${i + 1}</span><button class="mini" data-copy='${esc(payload).replace(/'/g, '&#39;')}'>⧉ Copy</button></div>
+        <pre class="codeblock">${esc(dispInput(tc.input))}</pre>
+        <div class="exp-label">expected</div>
+        <pre class="codeblock good">${esc(JSON.stringify(tc.expected))}</pre>
       </div>`;
     }).join('');
-    out.innerHTML = `<div class="cases-head"><div class="verdict-title" style="margin:0">🧪 Test cases</div><button class="mini" id="copy-all">⧉ Copy all</button></div>${items}${transcriptionNote()}`;
+    out.innerHTML = `<div class="cases-head"><div class="verdict-title" style="margin:0">🧪 Test cases</div><button class="mini" id="copy-all">⧉ Copy all</button></div>${items}`;
     out.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.getAttribute('data-copy'))));
-    const all = $('copy-all'); if (all) all.addEventListener('click', () => copyText(r.testCases.map((tc, i) => `#${i + 1} Input: ${JSON.stringify(tc.input)}\n     Expected: ${JSON.stringify(tc.expected)}`).join('\n')));
+    const all = $('copy-all'); if (all) all.addEventListener('click', () => copyText(r.testCases.map((tc) => rawInput(tc.input)).join('\n')));
     setStatusDone('cases-status', r.testCases.length + ' test cases');
   } catch (e) { setStatus('cases-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`; }
   finally { setBusy($('btn-cases'), false); }

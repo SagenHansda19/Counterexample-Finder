@@ -41,6 +41,7 @@ export function mockGenerate(): { artifact: GenerateResult; mock: true } {
   if (Array.isArray(output)) return output.slice().sort((a, b) => a - b);
   return output;
 }`,
+      paramNames: ['nums', 'target'],
       maxInputSize: 10,
       testCount: 40,
     },

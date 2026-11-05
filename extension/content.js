@@ -6,20 +6,26 @@
   window.__cxfInjected = true;
 
   function getEditorCode() {
-    // Strategy 1 — Monaco (current LeetCode). Each line is a `.view-line`
-    // inside `.view-lines`; concatenate their text.
+    // Strategy 1 — Monaco API: reads the FULL model value, immune to scroll
+    // virtualization (scraping .view-line misses off-screen lines).
+    try {
+      if (window.monaco && window.monaco.editor) {
+        const eds = window.monaco.editor.getEditors ? window.monaco.editor.getEditors() : [];
+        for (const ed of eds) {
+          try { const v = ed && ed.getValue && ed.getValue(); if (v && v.trim()) return v; } catch (e) {}
+        }
+        const models = window.monaco.editor.getModels ? window.monaco.editor.getModels() : [];
+        for (const m of models) {
+          try { const v = m && m.getValue && m.getValue(); if (v && v.trim()) return v; } catch (e) {}
+        }
+      }
+    } catch (e) {}
+    // Strategy 2 — DOM scrape of rendered lines (fallback when Monaco API absent).
     const lines = Array.from(document.querySelectorAll('.view-lines .view-line'));
     if (lines.length) {
       const text = lines.map((el) => el.textContent || '').join('\n');
       if (text.trim()) return text;
     }
-    // Strategy 2 — Monaco via global (if exposed).
-    try {
-      if (window.monaco && window.monaco.editor) {
-        const models = window.monaco.editor.getModels();
-        if (models && models.length) return models[0].getValue();
-      }
-    } catch (e) {}
     // Strategy 3 — CodeMirror 6: editable .cm-content (skip read-only snippets).
     const cmContents = Array.from(document.querySelectorAll('.cm-content'));
     let fallback = '';

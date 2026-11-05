@@ -6,6 +6,7 @@ export interface GenerateResult {
   generatorCode: string;
   userJs: string;
   normalizeCode: string;
+  paramNames: string[];
   maxInputSize: number;
   testCount: number;
 }
@@ -41,6 +42,12 @@ export const GENERATE_SCHEMA = {
       description:
         'JavaScript source that defines a function named `canon(output, input)`. It returns a CANONICAL form of an answer so that two equivalent answers compare equal. Use the PROBLEM statement to decide: if the problem allows any order / a set / a multiset (e.g. "you can return the answer in any order", "indices" of a set), sort or normalize so equivalent answers match (e.g. for an array of indices return output.slice().sort((a,b)=>a-b)); if the problem requires a specific order, return output unchanged. If output is undefined/null, return null. input is the array of positional args. Keep it deterministic and side-effect free.',
     },
+    paramNames: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'The parameter names of the user solution function, in order, as they appear in the signature (e.g. ["nums","target"]). Used only for display.',
+    },
     maxInputSize: {
       type: 'number',
       description: 'Smallest width hint that still hits the bug class (keep small, e.g. 6-10).',
@@ -69,6 +76,8 @@ You must emit the following executable JavaScript artifacts:
 4. canon(output, input) — a canonicalizer. Using the PROBLEM statement, return a form of an answer so that equivalent answers compare equal. If the problem allows multiple valid orderings or a set (e.g. "you can return the answer in any order", "a set of indices"), normalize (e.g. sort an array of indices). If a specific order is required, return the output unchanged. This prevents false positives when several answers are all correct.
 
 5. entryName — the exact function name of the user's solution to call.
+
+6. paramNames — the parameter names of that function in order (e.g. ["nums","target"]), taken from the user's signature.
 
 Rules:
 - Both bruteForce and makeInput must be self-contained and define their function using a top-level JavaScript function declaration (for example function NAME(args) { ... }) so they can be extracted. No imports, no outer wrapper, no template-literal backticks inside, no trailing exports.
