@@ -8,9 +8,6 @@
     "https://*.workers.dev/*",
     "https://leetcode.com/*"
   ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self' 'unsafe-eval'; object-src 'self'"
-  },
   "side_panel": { "default_path": "panel.html" },
   "action": { "default_title": "Open Counterexample panel" },
   "background": { "service_worker": "background.js" },

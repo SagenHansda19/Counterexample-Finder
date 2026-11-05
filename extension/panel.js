@@ -36,15 +36,12 @@ function needCode() {
   }
   return true;
 }
-// Your code is analyzed as JavaScript in the browser. If it wasn't already JS,
-// the model transcribes it (bug preserved) — tell the user that's what ran.
-function transcriptionNote(artifact) {
+// Your code runs as JavaScript on the Worker. If it wasn't already JS, the
+// model transcribes it (bug preserved) — tell the user that's what was tested.
+function transcriptionNote() {
   const raw = effCode();
   if (/function\s*\w*\s*\(|=>/.test(raw)) return '';
-  if (artifact && artifact.userJs && artifact.userJs.trim()) {
-    return '<p class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (the AI keeps the same logic &amp; bug). Hints use your original code.</p>';
-  }
-  return '';
+  return '<p class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (the AI keeps the same logic &amp; bug). Hints use your original code.</p>';
 }
 
 function seed() {
@@ -105,62 +102,30 @@ $('btn-hint').addEventListener('click', async () => {
 });
 
 
-async function runWorker(userCode, artifact, s, onProgress) {
-  const worker = new Worker('lib/verify-worker.js');
-  return await new Promise((resolve, reject) => {
-    worker.onmessage = (e) => {
-      const m = e.data;
-      if (m.type === 'progress') onProgress(m.done, m.total);
-      if (m.type === 'done') { worker.terminate(); resolve(m.result); }
-      if (m.type === 'error') { worker.terminate(); reject(new Error(m.error)); }
-    };
-    worker.postMessage({ userCode, artifact, seed: s });
-  });
-}
-
-async function getArtifact() {
-  const r = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-  return r.artifact;
-}
-
+// The heavy lifting (run the reference + user solution, find the failing input)
+// happens on the Cloudflare Worker, because browser contexts forbid `new Function`.
 $('btn-verify').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('verify-result');
   setBusy($('btn-verify'), true, 'Working…');
-  out.innerHTML = '<div class="muted">1/2 Writing a brute force…</div>';
-  let s;
+  out.innerHTML = '<div class="muted">Writing a brute force & running random tests…</div>';
   try {
-    const artifact = await getArtifact();
-    out.innerHTML = '<div class="muted">2/2 Running random tests in your browser…</div>';
-    s = seed();
-    const runCode = artifact.userJs && artifact.userJs.trim() ? artifact.userJs : effCode();
-    const wr = await runWorker(runCode, artifact, s, (d, t) => {
-      out.innerHTML = `<div class="muted">Running… ${Math.round((d / t) * 100)}%</div>`;
-    });
-    if (wr.best) {
-      out.innerHTML = `<div class="muted">Explaining root cause…</div>`;
-      const { explanation: text } = await callOp({
-        op: 'explain',
-        problem: effProblem(),
-        code: effCode(),
-        input: wr.best.input,
-        userOutput: wr.best.userOutput,
-        userError: wr.best.userError,
-        expected: wr.best.expected,
-      });
-      const b = wr.best;
+    const r = await callOp({ op: 'verify', problem: effProblem(), code: effCode() });
+    if (r.best) {
+      const b = r.best;
       out.innerHTML = `
         <div class="card bug">
           <div class="verdict-title">🐞 Smallest failing input</div>
           <pre class="codeblock">input:   ${esc(JSON.stringify(b.input))}</pre>
           <pre class="codeblock bad">yours:   ${esc(b.kind === 'crash' ? 'throws: ' + b.userError : JSON.stringify(b.userOutput))}</pre>
           <pre class="codeblock good">expected: ${esc(JSON.stringify(b.expected))}</pre>
-          <p class="explain">${esc(text)}</p>
-          ${transcriptionNote(artifact)}
+          <p class="explain">${esc(r.explanation || '')}</p>
+          ${transcriptionNote()}
         </div>`;
     } else {
-      out.innerHTML = `<div class="card ok"><div class="verdict-title">✅ No counterexample found</div><p class="muted">Matched the brute force on ${wr.testsRun} random tests.</p>${transcriptionNote(artifact)}</div>`;
+      out.innerHTML = `<div class="card ok"><div class="verdict-title">✅ No counterexample found</div><p class="muted">Matched the brute force on ${r.testsRun} random tests.</p>${transcriptionNote()}</div>`;
     }
+    if (r.bothFailed) out.innerHTML += '<div class="muted note">Note: the reference and your solution both threw on some inputs — results may be inconclusive.</div>';
   } catch (e) {
     out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
   } finally {
@@ -174,18 +139,16 @@ $('btn-cases').addEventListener('click', async () => {
   setBusy($('btn-cases'), true, 'Generating…');
   out.innerHTML = '<div class="muted">Building generator + reference…</div>';
   try {
-    const artifact = await getArtifact();
-    const runCode = artifact.userJs && artifact.userJs.trim() ? artifact.userJs : effCode();
-    const wr = await runWorker(runCode, artifact, seed(), () => {});
-    if (!wr.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; return; }
-    const items = wr.testCases.map((tc, i) => `
+    const r = await callOp({ op: 'cases', problem: effProblem(), code: effCode() });
+    if (!r.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; return; }
+    const items = r.testCases.map((tc, i) => `
       <div class="case-item">
         <div class="muted">#${i + 1} input</div>
         <pre class="codeblock">${esc(JSON.stringify(tc.input))}</pre>
         <div class="muted">expected</div>
         <pre class="codeblock good">${esc(JSON.stringify(tc.expected))}</pre>
       </div>`).join('');
-    out.innerHTML = `<div class="card"><div class="verdict-title">🧪 Test cases (copy & run locally)</div>${items}${transcriptionNote(artifact)}</div>`;
+    out.innerHTML = `<div class="card"><div class="verdict-title">🧪 Test cases (copy & run locally)</div>${items}${transcriptionNote()}</div>`;
   } catch (e) {
     out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
   } finally {
