@@ -17,11 +17,12 @@ const MAX_CODE = 16000;
 const GENERATE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['entryName', 'bruteForceCode', 'generatorCode', 'maxInputSize', 'testCount'],
+  required: ['entryName', 'bruteForceCode', 'generatorCode', 'userJs', 'maxInputSize', 'testCount'],
   properties: {
     entryName: { type: 'string', description: 'Exact name of the user solution function to call.' },
     bruteForceCode: { type: 'string', description: 'JS source defining function bruteForce(...args) — a slow, guaranteed-correct reference using the SAME positional args as makeInput returns.' },
     generatorCode: { type: 'string', description: 'JS source defining function makeInput(rng, size) returning an ARRAY of positional args. rng() returns a float in [0,1). Bias toward edge cases.' },
+    userJs: { type: 'string', description: 'JS source defining function entryName(...) — a FAITHFUL JavaScript version of the USER solution with the SAME name, SAME positional arguments, and the SAME logic INCLUDING any bug. If the user code is already JavaScript, copy it verbatim. Do NOT fix the bug; preserve its exact control flow.' },
     maxInputSize: { type: 'integer' },
     testCount: { type: 'integer' },
   },
@@ -40,8 +41,9 @@ const SYS = {
     '(1) entryName — the user\'s function name; ' +
     '(2) bruteForceCode — JS source for function bruteForce(...) implementing a CORRECT, SLOW (O(N^2)/exponential) reference; it must be genuinely correct because the tool relies on it; ' +
     '(3) generatorCode — JS source for function makeInput(rng, size) returning an ARRAY of positional args, biased toward edge cases (duplicates, 0, negatives, empty, boundaries); ' +
-    '(4) maxInputSize — a small integer (4..12); ' +
-    '(5) testCount — an integer 40..120. ' +
+    '(4) userJs — JS source for a function named EXACTLY entryName that is a faithful JavaScript re-implementation of the USER solution, preserving its EXACT logic and any bug (same control flow, same return values). If the user code is already JavaScript, copy it verbatim. It must accept the same positional arguments as makeInput returns. Do NOT fix the bug; ' +
+    '(5) maxInputSize — a small integer (4..12); ' +
+    '(6) testCount — an integer 40..120. ' +
     'Use plain top-level function declarations. No imports, no outer wrapper, no template-literal backticks inside the code strings.',
   explain:
     GUARD +
@@ -119,6 +121,7 @@ async function handleGenerate(env, problem, code) {
     entryName: String(art.entryName),
     bruteForceCode: String(art.bruteForceCode),
     generatorCode: String(art.generatorCode),
+    userJs: String(art.userJs || ''),
     maxInputSize: Number(art.maxInputSize) || 8,
     testCount: Number(art.testCount) || 60,
   };

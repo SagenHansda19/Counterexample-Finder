@@ -36,13 +36,15 @@ function needCode() {
   }
   return true;
 }
-// Verify/Test-Cases run your code in the browser via JavaScript only.
-function langGuard() {
-  if ($('manual-code').value.trim()) return null; // manual paste is assumed JS
-  if (pageData.lang && pageData.lang !== 'javascript') {
-    return 'Counterexample verification runs in your browser via <b>JavaScript</b>. Switch your LeetCode editor to <b>JavaScript</b> and click "Re-read page" (or paste your JS solution with "Paste manually"). <i>Hints work in any language.</i>';
+// Your code is analyzed as JavaScript in the browser. If it wasn't already JS,
+// the model transcribes it (bug preserved) — tell the user that's what ran.
+function transcriptionNote(artifact) {
+  const raw = effCode();
+  if (/function\s*\w*\s*\(|=>/.test(raw)) return '';
+  if (artifact && artifact.userJs && artifact.userJs.trim()) {
+    return '<p class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (the AI keeps the same logic &amp; bug). Hints use your original code.</p>';
   }
-  return null;
+  return '';
 }
 
 function seed() {
@@ -124,8 +126,6 @@ async function getArtifact() {
 $('btn-verify').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('verify-result');
-  const guard = langGuard();
-  if (guard) { out.innerHTML = `<div class="card bug"><div class="verdict-title">ℹ️ JavaScript required</div><p class="explain">${guard}</p></div>`; return; }
   setBusy($('btn-verify'), true, 'Working…');
   out.innerHTML = '<div class="muted">1/2 Writing a brute force…</div>';
   let s;
@@ -133,7 +133,8 @@ $('btn-verify').addEventListener('click', async () => {
     const artifact = await getArtifact();
     out.innerHTML = '<div class="muted">2/2 Running random tests in your browser…</div>';
     s = seed();
-    const wr = await runWorker(effCode(), artifact, s, (d, t) => {
+    const runCode = artifact.userJs && artifact.userJs.trim() ? artifact.userJs : effCode();
+    const wr = await runWorker(runCode, artifact, s, (d, t) => {
       out.innerHTML = `<div class="muted">Running… ${Math.round((d / t) * 100)}%</div>`;
     });
     if (wr.best) {
@@ -155,9 +156,10 @@ $('btn-verify').addEventListener('click', async () => {
           <pre class="codeblock bad">yours:   ${esc(b.kind === 'crash' ? 'throws: ' + b.userError : JSON.stringify(b.userOutput))}</pre>
           <pre class="codeblock good">expected: ${esc(JSON.stringify(b.expected))}</pre>
           <p class="explain">${esc(text)}</p>
+          ${transcriptionNote(artifact)}
         </div>`;
     } else {
-      out.innerHTML = `<div class="card ok"><div class="verdict-title">✅ No counterexample found</div><p class="muted">Matched the brute force on ${wr.testsRun} random tests.</p></div>`;
+      out.innerHTML = `<div class="card ok"><div class="verdict-title">✅ No counterexample found</div><p class="muted">Matched the brute force on ${wr.testsRun} random tests.</p>${transcriptionNote(artifact)}</div>`;
     }
   } catch (e) {
     out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
@@ -169,13 +171,12 @@ $('btn-verify').addEventListener('click', async () => {
 $('btn-cases').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('cases-result');
-  const guard = langGuard();
-  if (guard) { out.innerHTML = `<div class="card bug"><div class="verdict-title">ℹ️ JavaScript required</div><p class="explain">${guard}</p></div>`; return; }
   setBusy($('btn-cases'), true, 'Generating…');
   out.innerHTML = '<div class="muted">Building generator + reference…</div>';
   try {
     const artifact = await getArtifact();
-    const wr = await runWorker(effCode(), artifact, seed(), () => {});
+    const runCode = artifact.userJs && artifact.userJs.trim() ? artifact.userJs : effCode();
+    const wr = await runWorker(runCode, artifact, seed(), () => {});
     if (!wr.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; return; }
     const items = wr.testCases.map((tc, i) => `
       <div class="case-item">
@@ -184,7 +185,7 @@ $('btn-cases').addEventListener('click', async () => {
         <div class="muted">expected</div>
         <pre class="codeblock good">${esc(JSON.stringify(tc.expected))}</pre>
       </div>`).join('');
-    out.innerHTML = `<div class="card"><div class="verdict-title">🧪 Test cases (copy & run locally)</div>${items}</div>`;
+    out.innerHTML = `<div class="card"><div class="verdict-title">🧪 Test cases (copy & run locally)</div>${items}${transcriptionNote(artifact)}</div>`;
   } catch (e) {
     out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
   } finally {
