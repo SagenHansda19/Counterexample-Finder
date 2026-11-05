@@ -50,8 +50,8 @@ SECURITY & GUARDRAIL
 
 WHERE TO SEE IT
 ---------------
-Live backend:   <your Render service URL>
-Submit repo URL: <your public GitHub repo URL here>
+Live backend:   https://counterexample-finder.onrender.com
+Submit repo URL: https://github.com/SagenHansda19/Counterexample-Finder
 
 RESULTS (eval suite in evals/)
 -----------------------------

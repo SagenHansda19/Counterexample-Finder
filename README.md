@@ -10,6 +10,8 @@ The AI never *asserts* a bug — it **writes a correct brute force + a random te
 
 **🎯 Built for the [BharatCode Build League](https://bharatcode.ai/hackathon). Powered by a Qwen 3.8 27B model API (Adaption; swappable to BharatCode's `qwen-3.8-27b`).**
 
+> **🔴 Live backend:** `https://counterexample-finder.onrender.com` (already wired as the extension's default — just load the `extension/` folder and open a LeetCode problem).
+
 ## How it works
 ```
 [LeetCode tab]  ->  content script reads the problem + your code

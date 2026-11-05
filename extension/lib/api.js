@@ -6,11 +6,10 @@
 // them here as defaults before publishing.
 
 const DEFAULTS = {
-  // The single backend (Node service on Render). It holds the API key (private),
-  // enforces the guardrail, and runs the code (node:vm). Set this to your Render
-  // URL after deploying (or in the panel's ⚙️ Settings).
-  workerUrl: '',
-  // Must match the CXF_TOKEN env var set on the Render service.
+  // The backend (Node service on Render). It holds the API key (private),
+  // enforces the guardrail, and runs the code (node:vm). The shared token must
+  // match the CXF_TOKEN env var set on Render.
+  workerUrl: 'https://counterexample-finder.onrender.com',
   token: 'cef7f3a92d41b8e65c0a9347d2e8f160',
 };
 
