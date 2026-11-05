@@ -1,9 +1,9 @@
-// Extension -> Cloudflare Worker (guardrail + key-holder).
+// Extension -> backend (Node service, deployed on Render; or localhost for dev).
 // The extension NEVER holds the model API key and NEVER builds prompts.
-// It only picks an op and sends { op, problem, code, ... } to the Worker.
+// It only picks an op and sends { op, problem, code, ... } to the backend.
 //
-// Configure the Worker URL + shared token in the panel Settings (⚙️), or set them
-// here as defaults before publishing.
+// Configure the backend URL + shared token in the panel Settings (⚙️), or set
+// them here as defaults before publishing.
 
 const DEFAULTS = {
   // The single backend (Node service on Render). It holds the API key (private),

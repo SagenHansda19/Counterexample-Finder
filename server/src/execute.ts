@@ -28,6 +28,7 @@ export interface RunResult {
   testsRun: number;
   best: Finding | null;
   bothFailed: boolean;
+  genFailures: number;
   testCases: { input: unknown; expected: unknown }[];
 }
 
@@ -53,12 +54,14 @@ const HARNESS_TAIL = `
   const rng = mulberry32(seed);
   function run(args) { let uo, bu, ue, be; try { uo = __user(...args); } catch (e) { ue = String(e); } try { bu = __brute(...args); } catch (e) { be = String(e); } return { userOut: uo, bruteOut: bu, userErr: ue, bruteErr: be }; }
   const total = __TOTAL__; const maxN = __MAXN__;
-  const findings = []; let bothFailed = false;
-  for (let i = 1; i <= total; i++) { const size = Math.max(1, maxN - Math.floor(rng() * 4)); const args = __make(rng, size); const res = run(args); if (res.userErr && res.bruteErr) bothFailed = true; const f = classify(res, args); if (f) findings.push(f); }
+  const findings = []; let bothFailed = false; let genFailures = 0;
+  function gen() { for (let t = 0; t < 5; t++) { try { const size = Math.max(1, maxN - Math.floor(rng() * 4)); return __make(rng, size); } catch (e) { genFailures++; } } return null; }
+  for (let i = 1; i <= total; i++) { const args = gen(); if (!args) continue; const res = run(args); if (res.userErr && res.bruteErr) bothFailed = true; const f = classify(res, args); if (f) findings.push(f); }
   let best = pickBest(findings); if (best) best = shrinkSearch(best, run);
   const tcs = []; const rng2 = mulberry32((seed ^ 0x9e3779b9) >>> 0);
-  for (let k = 0; k < 5; k++) { const size = Math.max(1, maxN - Math.floor(rng2() * 4)); const args = __make(rng2, size); let exp, er; try { exp = __brute(...args); } catch (x) { er = String(x); } tcs.push({ input: args, expected: er ? { error: er } : exp }); }
-  return { testsRun: total, best: best || null, bothFailed, testCases: tcs };
+  function gen2() { for (let t = 0; t < 5; t++) { try { const size = Math.max(1, maxN - Math.floor(rng2() * 4)); return __make(rng2, size); } catch (e) {} } return null; }
+  for (let k = 0; k < 5; k++) { const args = gen2(); if (!args) continue; let exp, er; try { exp = __brute(...args); } catch (x) { er = String(x); } tcs.push({ input: args, expected: er ? { error: er } : exp }); }
+  return { testsRun: total, best: best || null, bothFailed, genFailures, testCases: tcs };
 })();
 `;
 
@@ -87,6 +90,7 @@ export function runArtifact(artifact: Artifact, seed: number, timeoutMs = 5000):
     testsRun: result.testsRun ?? 0,
     best: result.best ?? null,
     bothFailed: !!result.bothFailed,
+    genFailures: result.genFailures ?? 0,
     testCases: result.testCases ?? [],
   };
 }

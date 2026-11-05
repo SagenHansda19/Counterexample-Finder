@@ -143,6 +143,19 @@ $('btn-hint').addEventListener('click', async () => {
   finally { setBusy($('btn-hint'), false); }
 });
 
+async function generateAndRun() {
+  const problem = effProblem(), code = effCode();
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { artifact } = await callOp({ op: 'generate', problem, code });
+      const r = await callOp({ op: 'run', artifact, seed: (Date.now() % 999983) >>> 0 });
+      return { artifact, r };
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
 /* ---------- Verify ---------- */
 $('btn-verify').addEventListener('click', async () => {
   if (!needCode()) return;
@@ -152,9 +165,11 @@ $('btn-verify').addEventListener('click', async () => {
   setStatus('verify-status', 'Writing a brute force…');
   const t0 = Date.now();
   try {
-    const { artifact } = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-    setStatus('verify-status', 'Running random tests…');
-    const r = await callOp({ op: 'run', artifact, seed: (Date.now() % 999983) >>> 0 });
+    const { r } = await generateAndRun();
+    if (!r.best && (r.genFailures || 0) >= (r.testsRun || 1)) {
+      out.innerHTML = '<div class="card bug"><div class="verdict-title">⚠️ The AI\'s test generator kept failing on this problem.</div><div class="muted">Try again, or paste the code in JavaScript.</div></div>';
+      setStatus('verify-status', ''); setBusy($('btn-verify'), false); return;
+    }
     let explanation = '';
     if (r.best) {
       setStatus('verify-status', 'Found it — writing the root cause…');
@@ -192,9 +207,7 @@ $('btn-cases').addEventListener('click', async () => {
   out.innerHTML = '';
   setStatus('cases-status', 'Writing a generator + reference…');
   try {
-    const { artifact } = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-    setStatus('cases-status', 'Running tests…');
-    const r = await callOp({ op: 'run', artifact, seed: (Date.now() % 999983) >>> 0 });
+    const { artifact, r } = await generateAndRun();
     if (!r.testCases || !r.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; setStatus('cases-status', ''); return; }
     const names = (artifact.paramNames && artifact.paramNames.length) ? artifact.paramNames : (r.testCases[0].input || []).map((_, i) => 'arg' + i);
     const dispInput = (input) => (input || []).map((arg, i) => (names[i] || ('arg' + i)) + ' = ' + JSON.stringify(arg)).join('\n');
