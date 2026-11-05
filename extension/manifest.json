@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Counterexample Finder — LeetCode Copilot",
+  "version": "1.0.0",
+  "description": "Socratic hints (never the full solution), counterexample-finding, and test cases for your LeetCode solution — in a side panel.",
+  "permissions": ["storage", "tabs", "activeTab", "sidePanel"],
+  "host_permissions": [
+    "https://*.workers.dev/*",
+    "https://leetcode.com/*"
+  ],
+  "side_panel": { "default_path": "panel.html" },
+  "action": { "default_title": "Open Counterexample panel" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Counterexample Finder</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header class="hd">
+      <div class="hd-row">
+        <h1>🐞 Counterexample Finder</h1>
+        <button id="btn-settings" class="icon" title="Settings">⚙️</button>
+      </div>
+      <div id="title" class="title">Loading problem…</div>
+      <div id="extract-bar">
+        <button id="btn-extract" class="small">↻ Re-read page</button>
+        <span id="extract-status" class="muted"></span>
+      </div>
+    </header>
+
+    <div id="code-wrap">
+      <div class="code-label">YOUR CODE</div>
+      <pre id="code" class="code"></pre>
+    </div>
+
+    <nav class="tabs">
+      <button data-tab="hints" class="tab active">💡 Hints</button>
+      <button data-tab="verify" class="tab">🐞 Verify</button>
+      <button data-tab="cases" class="tab">🧪 Test Cases</button>
+    </nav>
+
+    <section id="tab-hints" class="pane active">
+      <div class="row">
+        <select id="hint-level">
+          <option value="nudge">🟢 Gentle nudge</option>
+          <option value="approach">🟠 Approach hint</option>
+          <option value="debug" selected>🔴 Debug my code</option>
+        </select>
+        <button id="btn-hint" class="primary">Get hint</button>
+      </div>
+      <div id="hint-result" class="out"></div>
+    </section>
+
+    <section id="tab-verify" class="pane">
+      <button id="btn-verify" class="primary">Find counterexample</button>
+      <div id="verify-result" class="out"></div>
+    </section>
+
+    <section id="tab-cases" class="pane">
+      <button id="btn-cases" class="primary">Generate test cases</button>
+      <div id="cases-result" class="out"></div>
+    </section>
+
+    <section id="settings" class="pane">
+      <h2>Settings</h2>
+      <label class="fld"><span>Worker URL</span><input id="cfg-base" /></label>
+      <label class="fld"><span>Shared token</span><input id="cfg-token" type="password" /></label>
+      <button id="btn-save-cfg" class="primary">Save</button>
+      <div id="cfg-status" class="muted"></div>
+      <p class="muted note">Requests go only to your Worker (never to a public model with your key). Your LeetCode code is not stored anywhere.</p>
+    </section>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>
