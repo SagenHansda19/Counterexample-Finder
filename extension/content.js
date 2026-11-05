@@ -30,7 +30,11 @@
       let y = 0;
       const tr = el.style && el.style.transform;
       if (tr) {
-        const tm = tr.match(/translate\([^,]+,\s*([-\d.]+)px\)/) || tr.match(/matrix\([^)]*\,\s*([-\d.]+)\)/);
+        const tm =
+          tr.match(/translate\([^,]+,\s*([-\d.]+)px/) ||
+          tr.match(/translate3d\([^,]+,\s*([-\d.]+)px/) ||
+          tr.match(/translateY\(\s*([-\d.]+)px/) ||
+          tr.match(/matrix\([^)]*?,\s*([-\d.]+)\)/);
         if (tm) y = parseFloat(tm[1]);
       }
       return { y, text: el.textContent || '' };
@@ -157,9 +161,49 @@
     else document.addEventListener('DOMContentLoaded', addButton);
   } catch (e) {}
 
+  // One-time diagnostic (console) to help fix Monaco extraction on LeetCode.
+  let _lastCode = null;
+  function maybeLogDiag(code) {
+    if (code === _lastCode) return;
+    _lastCode = code;
+    // Dump every line's position signals from the largest container so we can
+    // see how Monaco actually orders its .view-line nodes.
+    const containers = Array.from(document.querySelectorAll('.view-lines'));
+    let best = null;
+    for (const c of containers) if (!best || c.querySelectorAll('.view-line').length > best.querySelectorAll('.view-line').length) best = c;
+    let lineDump = null;
+    if (best) {
+      lineDump = Array.from(best.querySelectorAll('.view-line')).map((el) => ({
+        t: el.style ? el.style.transform : null,
+        top: el.style ? el.style.top : null,
+        otop: el.offsetTop,
+        x: (el.textContent || '').slice(0, 22),
+      }));
+    }
+    const firstView = document.querySelector('.view-lines .view-line');
+    let monacoInfo = 'window.monaco=' + typeof window.monaco;
+    try {
+      const keys = Object.keys(window).filter((k) => /monaco|editor/i.test(k));
+      if (keys.length) monacoInfo += '; window keys: [' + keys.slice(0, 20).join(',') + ']';
+    } catch (e) {}
+    console.log(
+      '%c[cxf-diag]','color:#6d5cff;font-weight:bold',
+      {
+        codeLen: code ? code.length : 0,
+        codeLines: code ? code.split('\n').length : 0,
+        monaco: monacoInfo,
+        lineDump,
+        firstViewTransform: firstView && firstView.style ? firstView.style.transform : null,
+      },
+    );
+    if (lineDump && lineDump.length) console.table(lineDump);
+  }
+
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === 'cxf:extract') {
-      sendResponse(extract());
+      const r = extract();
+      maybeLogDiag(r.code);
+      sendResponse(r);
       return false;
     }
   });

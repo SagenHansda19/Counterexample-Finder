@@ -170,7 +170,7 @@ async function opHandler(req: Request, res: Response) {
         body.level +
         ' ("nudge"=light, "approach"=may name the data structure, "debug"=point at the buggy line/region in words, do NOT rewrite it). ' +
         'Use the problem\'s ACTUAL parameter names (from the CODE signature) whenever you give an example input — e.g. `nums = [3, 3], target = 6` — not bare arrays. Keep examples short (2-4).';
-      const raw = await client.complete({ system: sys, user: sb('PROBLEM', problem) + '\n\n' + sb('CODE', code) + '\n\nGive hints only.', maxOutputTokens: 900, temperature: 0.4 });
+      const raw = await client.complete({ system: sys, user: sb('PROBLEM', problem) + '\n\n' + sb('CODE', code) + '\n\nGive hints only.', maxOutputTokens: 1400, temperature: 0.4 });
       return res.json({ hint: raw });
     }
     if (op === 'run') {

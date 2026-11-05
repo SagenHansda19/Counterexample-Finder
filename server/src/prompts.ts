@@ -124,7 +124,7 @@ EXPECTED (from the verified brute force):
 ${JSON.stringify(expected)}
 
 Root cause and fix:`,
-    maxOutputTokens: 900,
+    maxOutputTokens: 1600,
     temperature: 0.3,
   };
 }
