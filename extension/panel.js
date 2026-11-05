@@ -59,51 +59,12 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// Run the generated reference + user solution LOCALLY in a Blob-URL Web Worker.
-// The generated code is the worker's entry script (normal script load — no
-// new Function / eval), so it works under the MV3 extension CSP (worker-src blob:).
-function buildRunBlob(artifact, seed) {
-  const total = Math.max(1, artifact.testCount || 60);
-  const maxN = artifact.maxInputSize || 10;
-  const src =
-    '(function(){\n' +
-    'function mulberry32(sd){let s=sd>>>0;return function(){s+=0x6d2b79f5;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}\n' +
-    'function deepEqual(a,b){if(Object.is(a,b))return true;if(Array.isArray(a)&&Array.isArray(b)){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!deepEqual(a[i],b[i]))return false;return true;}if(a&&b&&typeof a==="object"&&typeof b==="object"){const ka=Object.keys(a),kb=Object.keys(b);if(ka.length!==kb.length)return false;for(const k of ka)if(!Object.prototype.hasOwnProperty.call(b,k)||!deepEqual(a[k],b[k]))return false;return true;}return false;}\n' +
-    'function sizeMetric(args){let tot=0;const w=v=>{if(Array.isArray(v)){tot+=v.length;v.forEach(w);}else if(v&&typeof v==="object")Object.values(v).forEach(w);else if(typeof v==="number")tot+=Math.abs(v);else tot+=1;};args.forEach(w);return tot;}\n' +
-    'function classify(res,args){if(!res.userErr&&!res.bruteErr){if(!deepEqual(res.userOut,res.bruteOut))return{kind:"mismatch",input:args,userOutput:res.userOut,expected:res.bruteOut,sizeMetric:sizeMetric(args)};return null;}if(res.userErr&&!res.bruteErr)return{kind:"crash",input:args,userError:res.userErr,expected:res.bruteOut,sizeMetric:sizeMetric(args)};return null;}\n' +
-    'function pickBest(f){let b=null;for(const x of f)if(!b||x.sizeMetric<b.sizeMetric)b=x;return b;}\n' +
-    'function shrinkSearch(best,run){let cur=best;let budget=90;let improved=true;while(improved&&budget>0){improved=false;for(let idx=0;idx<cur.input.length&&budget>0;idx++){const item=cur.input[idx];if(!Array.isArray(item))continue;for(let len=item.length-1;len>=0&&budget>0;len--){budget--;const c=cur.input.slice();c[idx]=item.slice(0,len);const f=classify(run(c),c);if(f&&f.sizeMetric<cur.sizeMetric){cur=f;improved=true;break;}}}}return cur;}\n' +
-    artifact.userJs + '\n' +
-    artifact.bruteForceCode + '\n' +
-    artifact.generatorCode + '\n' +
-    'const __user = ' + artifact.entryName + ';\n' +
-    'const __brute = bruteForce;\n' +
-    'const __make = makeInput;\n' +
-    'if(typeof __user!=="function"||typeof __brute!=="function"||typeof __make!=="function"){postMessage({type:"error",error:"could not build runnable functions (entry: ' + artifact.entryName + ')"});return;}\n' +
-    'const seed=' + seed + '>>>0;const rng=mulberry32(seed);\n' +
-    'function run(args){let uo,bu,ue,be;try{uo=__user(...args);}catch(e){ue=String(e);}try{bu=__brute(...args);}catch(e){be=String(e);}return{userOut:uo,bruteOut:bu,userErr:ue,bruteErr:be};}\n' +
-    'const total=' + total + ';const maxN=' + maxN + ';\n' +
-    'const findings=[];let bothFailed=false;\n' +
-    'for(let i=1;i<=total;i++){const size=Math.max(1,maxN-Math.floor(rng()*4));const args=__make(rng,size);const res=run(args);if(res.userErr&&res.bruteErr)bothFailed=true;const f=classify(res,args);if(f)findings.push(f);}\n' +
-    'let best=pickBest(findings);if(best)best=shrinkSearch(best,run);\n' +
-    'const tcs=[];const rng2=mulberry32((seed^0x9e3779b9)>>>0);\n' +
-    'for(let k=0;k<5;k++){const size=Math.max(1,maxN-Math.floor(rng2()*4));const args=__make(rng2,size);let exp,er;try{exp=__brute(...args);}catch(x){er=String(x);}tcs.push({input:args,expected:er?{error:er}:exp});}\n' +
-    'postMessage({type:"done",result:{testsRun:total,best:best||null,bothFailed,testCases:tcs}});\n' +
-    '})();\n';
-  return URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-}
-
-function runLocalVerification(artifact) {
+// Execution happens on the Node server (node:vm), because browsers (MV3 CSP)
+// and the free Cloudflare tier can't run the AI-generated reference code. The
+// panel sends the artifact to the server's `run` op and gets back the findings.
+async function runRemoteVerification(artifact) {
   const s = seed();
-  const url = buildRunBlob(artifact, s);
-  return new Promise((resolve, reject) => {
-    let w;
-    try { w = new Worker(url); } catch (e) { URL.revokeObjectURL(url); reject(new Error('worker create: ' + e.message)); return; }
-    const to = setTimeout(() => { try { w.terminate(); } catch (_) {} URL.revokeObjectURL(url); reject(new Error('verification timed out')); }, 15000);
-    const done = () => { clearTimeout(to); try { w.terminate(); } catch (_) {} URL.revokeObjectURL(url); };
-    w.onmessage = (e) => { done(); if (e.data && e.data.type === 'done') resolve(e.data.result); else reject(new Error((e.data && e.data.error) || 'worker error')); };
-    w.onerror = (e) => { done(); reject(new Error('worker error: ' + ((e && e.message) || 'unknown'))); };
-  });
+  return callOp({ op: 'run', artifact, seed: s });
 }
 
 document.querySelectorAll('.tab').forEach((btn) => {
@@ -159,8 +120,8 @@ $('btn-verify').addEventListener('click', async () => {
   out.innerHTML = '<div class="muted">Writing a brute force…</div>';
   try {
     const { artifact } = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-    out.innerHTML = '<div class="muted">Running random tests in your browser…</div>';
-    const r = await runLocalVerification(artifact);
+    out.innerHTML = '<div class="muted">Running random tests…</div>';
+    const r = await runRemoteVerification(artifact);
     let explanation = '';
     if (r.best) {
       out.innerHTML = '<div class="muted">Found it — asking for the root cause…</div>';
@@ -204,8 +165,8 @@ $('btn-cases').addEventListener('click', async () => {
   out.innerHTML = '<div class="muted">Writing a generator + reference…</div>';
   try {
     const { artifact } = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-    out.innerHTML = '<div class="muted">Running in your browser…</div>';
-    const r = await runLocalVerification(artifact);
+    out.innerHTML = '<div class="muted">Running tests…</div>';
+    const r = await runRemoteVerification(artifact);
     if (!r.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; return; }
     const items = r.testCases.map((tc, i) => `
       <div class="case-item">
@@ -226,5 +187,18 @@ $('btn-extract').addEventListener('click', extractFromPage);
 $('btn-manual').addEventListener('click', () => {
   $('manual-wrap').hidden = !$('manual-wrap').hidden;
 });
+
+// Keep the (free, auto-sleeping) backend warm while the panel is open, so the
+// first click doesn't wait for a cold start.
+async function pingServer() {
+  try {
+    const cfg = await getConfig();
+    if (!cfg.workerUrl) return;
+    await fetch(cfg.workerUrl.replace(/\/$/, '') + '/health', { method: 'GET', cache: 'no-store' });
+  } catch (_) { /* ignore */ }
+}
+pingServer();
+setInterval(pingServer, 45000);
+
 extractFromPage();
 

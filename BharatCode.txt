@@ -1,69 +1,77 @@
 BharatCode Build League - Round 1 submission
-==============================================
+=============================================
 
-Project:   Counterexample Finder
+Project:   Counterexample Finder - LeetCode Copilot (Chrome extension)
 Track:     Coding & developer tools
 Builder:   Sagen Hansda (@SagenHansda19)
 License:   MIT
 
 WHAT IT IS
 ----------
-Paste the problem statement and your buggy competitive-programming /
-LeetCode solution. Counterexample Finder uses BharatCode to write a
-guaranteed-correct brute-force solution and a random test generator, then
-RUNS both in your browser and returns the SMALLEST input that breaks your
-code, along with a plain-language root cause.
+A Chrome extension that opens in a side panel on LeetCode. With a problem and
+your (possibly buggy) solution, it gives you:
+  * the SMALLEST input that breaks your code, plus your output, the expected
+    output, and a plain-language root cause (Verify);
+  * Socratic hints that guide you to the fix WITHOUT ever giving the full
+    solution (Hints);
+  * random test cases with expected outputs you can run locally (Test Cases).
 
-This is the "AI proposes, code verifies" pattern: the AI never asserts a bug —
-it writes a reference and your browser proves the mismatch with real inputs
-and real outputs. No hallucinated explanations, no sandbox, no server cost.
+The model never asserts a bug. It writes a guaranteed-correct brute force and a
+random test generator; the backend RUNS both on ~60 seeded random inputs and
+only reports a real mismatch (real input -> your output vs expected). That is
+the "AI proposes, code verifies" pattern: no hallucinated explanations.
+
+HOW IT USES THE MODEL API
+-------------------------
+- OpenAI-compatible Chat Completions endpoint (Adaption now; swappable to
+  BharatCode qwen-3.8-27b). Model: Qwen 3.8 27B.
+- op=generate (strict JSON schema) -> { entryName, bruteForceCode,
+  generatorCode, userJs, maxInputSize, testCount }. userJs is a faithful JS
+  version of YOUR code with the SAME bug (transcribed from C++/Python/etc.).
+- op=run   -> node:vm executes the reference + your code on seeded inputs,
+  finds the smallest failing input (bounded shrink search), per-run timeout.
+- op=explain -> root cause from the REAL failing input + both outputs.
+- op=hint   -> Socratic hint, never a full solution.
+- Refuses false positives: if the reference and your code both throw on the
+  same input, it reports an inconclusive "reference check".
+- Resilient client: retries 503/429/5xx with backoff + jitter, honours
+  Retry-After, 180s timeout, drops optional params on a 400, empty/truncated
+  output = error.
+
+SECURITY & GUARDRAIL
+--------------------
+- The model can ONLY do the 4 fixed ops with fixed prompts; the problem and
+  code are wrapped as UNTRUSTED user data (prompt-injection safe).
+- The API key lives ONLY on the backend (Render env var); the extension sends
+  just a shared token + the task. A request without the token is rejected (403).
+- Verification runs on a Node service (browsers and the free Cloudflare tier
+  cannot run dynamically generated code), with a node:vm timeout so model code
+  cannot hang the service.
 
 WHERE TO SEE IT
 ---------------
-Live demo:        <your frontend URL, e.g. https://counterexample-finder.vercel.app>
-Submit repo URL:  <your public GitHub repo URL here>
+Live backend:   <your Render service URL>
+Submit repo URL: <your public GitHub repo URL here>
 
-DEMO IN 10 SECONDS
-------------------
-1. Open the live app.
-2. Click "Load Sample: Two-Pointer Off-by-One" (works WITHOUT an API key).
-3. Click "Find counterexample". You get the smallest input that breaks it,
-   your output, the expected output and the root cause.
-
-HOW IT USES THE BHARATCODE API
--------------------------------
-- Endpoint: https://bharatcode.ai/api/model/v1/chat/completions (OpenAI-compatible)
-- Model:    qwen-3.8-27b
-- Call A (generate): produces { entryName, bruteForceCode, generatorCode,
-  maxInputSize, testCount } using strict JSON-schema structured output.
-- Call B (explain): explains the root cause from the REAL failing input +
-  both outputs (free text, so it cannot invent).
-- Refuses to trust the model blindly: if the brute-force and your code both
-  fail on the same generated input, it reports a "reference check" instead of
-  a false positive.
-- Resilient to shared capacity: retries 503/5xx/429 with backoff + jitter,
-  honours Retry-After, 180s timeout, drops optional params on 400, and treats
-  empty / truncated output as an error.
-
-RESULTS (eval suite in evals/, qwen-3.8-27b on BharatCode)
----------------------------------------------------------
+RESULTS (eval suite in evals/)
+-----------------------------
 - Planted bugs caught:   7 / 7, with the smallest failing input
 - False positives:       0   (a correct solution is never flagged)
 Reproduce: node evals/run.js
 
 RUN IT LOCALLY
 --------------
-1. cp .env.example .env   # add your BHARATCODE_API_KEY (free for students)
+1. cp .env.example .env   # set BHARATCODE_API_KEY (Adaption) + CXF_TOKEN
 2. npm run install:all
-3. npm run dev
-   -> app on http://localhost:5173   (API on http://localhost:4000)
-Without a key it runs in demo mode using the built-in sample.
+3. npm run build && npm start     # backend on http://localhost:4000
+4. Load the extension/ folder (unpacked) in chrome://extensions, point its
+   Settings at the backend URL + token, open a LeetCode problem, click the icon.
 
 ENGINEERING
 -----------
-app/   Vite + React + TypeScript frontend; verification runs in a Web Worker
-       (seeded RNG, deep-equal, bounded shrink search for the smallest input).
-server/ Node + Express + TypeScript thin proxy that keeps your API key
-       server-side.
-
-
+extension/  MV3 Chrome extension: content script (reads problem + code, Monaco/
+            CodeMirror aware) + side panel (3 features). No API key in the
+            extension.
+server/    Node + Express + TypeScript: LLM proxy + node:vm executor + guardrail;
+            keeps the API key server-side. Deployable on Render (render.yaml).
+app/       optional standalone web demo (Vite + React + TypeScript).

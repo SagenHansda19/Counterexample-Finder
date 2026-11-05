@@ -4,12 +4,9 @@
   "version": "1.0.0",
   "description": "Socratic hints (never the full solution), counterexample-finding, and test cases for your LeetCode solution — in a side panel.",
   "permissions": ["storage", "tabs", "activeTab", "sidePanel"],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; worker-src 'self' blob:;"
-  },
   "host_permissions": [
-    "https://*.workers.dev/*",
-    "https://leetcode.com/*"
+    "https://leetcode.com/*",
+    "https://*.onrender.com/*"
   ],
   "side_panel": { "default_path": "panel.html" },
   "action": { "default_title": "Open Counterexample panel" },

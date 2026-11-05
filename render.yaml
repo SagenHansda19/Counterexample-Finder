@@ -1,10 +1,10 @@
-# Render blueprint — one service that serves the built app AND the API on a single URL.
-# Deploys the Express server (:4000), which serves app/dist + /api/analyze + /api/explain.
-# 1. Push this repo to GitHub, then "New Web Service -> Free".
-# 2. Set these env vars in Render (matching server reads them via .env):
-#    BHARATCODE_API_KEY   = your key (Adaption pt_live_... or your BharatCode key)
-#    BHARATCODE_MODEL    = qwen3.8-27b
-#    BHARATCODE_BASE_URL  = https://api.prod.adaptionlabs.ai/api/v1
+# Render blueprint — one Node service that serves the API on a single URL.
+# Handles every op the extension needs: generate / explain / hint (LLM via the
+# Adaption key) and run (node:vm executes the generated reference + user code).
+# The API key + guardrail token live ONLY here as env vars (never in the repo
+# or the extension).
+# 1. Push this repo to GitHub, then Render -> "New Web Service" -> Free.
+# 2. Set env vars (shown below); the server reads them from the environment.
 services:
   - type: web
     name: counterexample-finder
@@ -14,9 +14,12 @@ services:
     startCommand: npm run start
     envVars:
       - key: BHARATCODE_API_KEY
-        value: your_key_here
+        value: your_adaption_pt_live_key_here
+        sync: false
       - key: BHARATCODE_MODEL
         value: qwen3.8-27b
       - key: BHARATCODE_BASE_URL
         value: https://api.prod.adaptionlabs.ai/api/v1
+      - key: CXF_TOKEN
+        value: cef7f3a92d41b8e65c0a9347d2e8f160
         sync: false

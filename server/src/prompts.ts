@@ -4,6 +4,7 @@ export interface GenerateResult {
   entryName: string;
   bruteForceCode: string;
   generatorCode: string;
+  userJs: string;
   maxInputSize: number;
   testCount: number;
 }
@@ -12,7 +13,7 @@ export interface GenerateResult {
 export const GENERATE_SCHEMA = {
   type: 'object' as const,
   additionalProperties: false,
-  required: ['entryName', 'bruteForceCode', 'generatorCode'],
+  required: ['entryName', 'bruteForceCode', 'generatorCode', 'userJs'],
   properties: {
     entryName: {
       type: 'string',
@@ -28,6 +29,11 @@ export const GENERATE_SCHEMA = {
       type: 'string',
       description:
         'JavaScript source that defines a function named `makeInput(rng, size)`. rng is a seeded function returning a float in [0,1). size is a hint for the desired input size. It returns an ARRAY of positional arguments to pass to both bruteForce and the user solution. It must be self-contained.',
+    },
+    userJs: {
+      type: 'string',
+      description:
+        'JavaScript source that defines a function named EXACTLY entryName — a faithful JavaScript version of the USER solution, preserving its EXACT logic and any bug (same control flow, same return values). If the user code is already JavaScript, copy it verbatim. It must accept the same positional arguments that makeInput returns. Do NOT fix the bug.',
     },
     maxInputSize: {
       type: 'number',
@@ -46,13 +52,15 @@ export const SYSTEM_GENERATE = `You are the code-generation stage of a "countere
 
 The user gives you a problem statement and their (possibly buggy) solution in JavaScript. Your job: produce artifacts that let a verifier PROVE the bug by running code, never by trusting your words.
 
-You must emit exactly three executable JavaScript artifacts:
+You must emit the following executable JavaScript artifacts:
 
 1. bruteForce — a correct, safe, SLOW reference solution. Correctness beats speed. Prefer an O(N^2) or exponential scan so it is obviously right. It must be defined as a function named bruteForce and accept the SAME positional arguments returned by makeInput.
 
 2. makeInput(rng, size) — a random test-case generator. rng is a seeded function: calling rng() returns a float in [0,1). size is an integer hint for how big the input should be (you can use Math.max(2, floor(size - floor(rng()*3)))). It must return an ARRAY of positional arguments (e.g. [nums, target]). Bias it to craft inputs that trigger tricky edge cases for the problem (duplicates, zeros, negatives, empty, boundaries), while still being random. Do NOT put the solution logic in here.
 
-3. entryName — the exact function name of the user's solution to call.
+3. userJs — a faithful JavaScript re-implementation of the USER's solution, as a function named EXACTLY entryName, with the SAME logic INCLUDING any bug. If the user code is already JavaScript, copy it verbatim. If it is in another language (C++, Python, etc.), transcribe it to JavaScript keeping the exact control flow and bug. Do NOT fix the bug.
+
+4. entryName — the exact function name of the user's solution to call.
 
 Rules:
 - Both bruteForce and makeInput must be self-contained and define their function using a top-level JavaScript function declaration (for example function NAME(args) { ... }) so they can be extracted. No imports, no outer wrapper, no template-literal backticks inside, no trailing exports.

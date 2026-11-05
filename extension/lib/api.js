@@ -6,11 +6,11 @@
 // here as defaults before publishing.
 
 const DEFAULTS = {
-  // Your Cloudflare Worker URL (public endpoint — safe to hardcode).
-  workerUrl: 'https://counterexample-finder.sagenh009.workers.dev',
-  // Must match the CXF_TOKEN set on the Worker. Hardcoded now for frictionless
-  // testing; before publishing to the Store, clear this to '' so it's
-  // Settings-only (prevents unknown users from spending your free credits).
+  // The single backend (Node service on Render). It holds the API key (private),
+  // enforces the guardrail, and runs the code (node:vm). Set this to your Render
+  // URL after deploying (or in the panel's ⚙️ Settings).
+  workerUrl: '',
+  // Must match the CXF_TOKEN env var set on the Render service.
   token: 'cef7f3a92d41b8e65c0a9347d2e8f160',
 };
 

@@ -10,6 +10,14 @@ export function mockGenerate(): { artifact: GenerateResult; mock: true } {
     mock: true,
     artifact: {
       entryName: 'solution',
+      userJs: `function solution(nums, target) {
+  for (let i = 1; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      if (nums[i] + nums[j] === target) return [i, j];
+    }
+  }
+  return [];
+}`,
       bruteForceCode: `function bruteForce(nums, target) {
   for (let i = 0; i < nums.length; i++) {
     for (let j = i + 1; j < nums.length; j++) {
