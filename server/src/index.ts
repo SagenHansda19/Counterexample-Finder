@@ -17,6 +17,15 @@ const CXF_TOKEN = process.env.CXF_TOKEN || '';
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
+// CORS: allow the extension (and any origin) to call this API, incl. preflight.
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'content-type, x-cxf');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 const apiKey = process.env.BHARATCODE_API_KEY;
 const client = apiKey
   ? new BharatCodeClient({
@@ -110,11 +119,12 @@ function artifactFromBody(body: any): Artifact | null {
 }
 
 async function opHandler(req: Request, res: Response) {
+  const body = req.body ?? {};
+  console.log(`[cxf] POST ${req.url} op=${body.op ?? '-'} tokenOk=${CXF_TOKEN ? req.headers['x-cxf'] === CXF_TOKEN : 'no-token-required'}`);
   if (CXF_TOKEN && req.headers['x-cxf'] !== CXF_TOKEN) {
     res.status(403).json({ error: 'forbidden' });
     return;
   }
-  const body = req.body ?? {};
   const op = body.op;
   if (!OPS.has(op)) {
     res.status(400).json({ error: 'op must be one of: generate, explain, hint, run' });

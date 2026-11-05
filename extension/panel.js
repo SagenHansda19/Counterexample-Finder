@@ -2,71 +2,68 @@ import { callOp, getConfig, saveConfig } from './lib/api.js';
 
 const $ = (id) => document.getElementById(id);
 let pageData = { title: '', statement: '', code: '', lang: 'javascript' };
+let lastCodeKey = '';
 
+/* ---------- small helpers ---------- */
+function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function md(s) {
+  if (!s) return '';
+  const lines = String(s).split('\n');
+  let html = '', inList = false;
+  const inline = (t) => esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  for (const raw of lines) {
+    const line = raw;
+    if (/^\s*$/.test(line)) { if (inList) { html += '</div>'; inList = false; } continue; }
+    if (/^#{1,4}\s/.test(line)) { if (inList) { html += '</div>'; inList = false; } html += `<div class="md-h">${inline(line.replace(/^#{1,4}\s*/, ''))}</div>`; continue; }
+    if (/^\s*[-•*]\s+/.test(line)) { if (!inList) { html += '<div class="md-list">'; inList = true; } html += `<div class="md-li">${inline(line.replace(/^\s*[-•*]\s+/, ''))}</div>`; continue; }
+    if (inList) { html += '</div>'; inList = false; }
+    html += `<div class="md-p">${inline(line)}</div>`;
+  }
+  if (inList) html += '</div>';
+  return html;
+}
+function setStatus(id, text) { $(id).innerHTML = text ? `<span class="spinner"></span><span>${esc(text)}</span>` : ''; }
+function setStatusDone(id, text) { $(id).innerHTML = text ? `<span class="done">✓ ${esc(text)}</span>` : ''; }
+function clearStatus(id) { $(id).innerHTML = ''; }
+function setBusy(btn, on) { btn.disabled = on; }
+function toast(msg) { let t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); clearTimeout(t._to); t._to = setTimeout(() => t.classList.remove('show'), 1600); }
+async function copyText(text) { try { await navigator.clipboard.writeText(text); } catch (e) { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } toast('Copied to clipboard'); }
+
+function effProblem() { return pageData.statement || pageData.title || ''; }
+function effCode() { return pageData.code || ''; }
+function needCode() { if (!effCode()) { setStatus('verify-status', ''); toast('No code detected — write some in the LeetCode editor'); return false; } return true; }
+function transcriptionNote() { const raw = effCode(); if (/function\s*\w*\s*\(|=>/.test(raw)) return ''; return '<div class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (same logic &amp; bug kept).</div>'; }
+
+/* ---------- page reading + auto refresh ---------- */
 async function extractFromPage() {
-  $('extract-status').textContent = 'Reading page…';
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const res = await chrome.tabs.sendMessage(tab.id, { type: 'cxf:extract' });
-    if (res && res.code) {
+    if (res && (res.code || res.title)) {
+      const changed = (res.code || '') !== lastCodeKey;
+      lastCodeKey = res.code || '';
       pageData = res;
       $('title').textContent = res.title || 'Untitled problem';
-      $('code').textContent = res.code;
-      $('extract-status').textContent = '✓ Read ' + (res.code.length || 0) + ' chars of code';
+      $('code').textContent = res.code || '';
+      const n = (res.code || '').split('\n').length;
+      $('code-count').textContent = res.code ? 'Your code · ' + n + ' lines' : 'Your code (empty)';
+      const dot = $('sync-dot'), st = $('extract-status');
+      dot.className = 'dot ' + (changed ? 'dot-live' : 'dot-idle');
+      st.textContent = changed ? 'Updated just now' : (res.code ? 'Live · ' + (res.code.length) + ' chars' : 'No code yet — start typing');
+      if (changed) setTimeout(() => { dot.className = 'dot dot-idle'; }, 900);
     } else {
-      $('extract-status').textContent = 'No code found — open a LeetCode problem with your code in the editor.';
+      $('sync-dot').className = 'dot dot-error';
+      $('extract-status').textContent = 'On a LeetCode problem page? Re-read.';
     }
   } catch (e) {
-    $('extract-status').textContent = 'Could not read page: ' + e.message;
+    $('sync-dot').className = 'dot dot-error';
+    $('extract-status').textContent = 'Could not read page';
   }
 }
 
-function effProblem() {
-  const m = $('manual-problem').value.trim();
-  return m || pageData.statement || pageData.title || '';
-}
-function effCode() {
-  const m = $('manual-code').value.trim();
-  return m || pageData.code || '';
-}
-function needCode() {
-  if (!effCode()) {
-    alert('No code detected. Re-read the page, or click "Paste manually" and paste your JavaScript solution.');
-    return false;
-  }
-  return true;
-}
-// Your code runs as JavaScript on the Worker. If it wasn't already JS, the
-// model transcribes it (bug preserved) — tell the user that's what was tested.
-function transcriptionNote() {
-  const raw = effCode();
-  if (/function\s*\w*\s*\(|=>/.test(raw)) return '';
-  return '<p class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (the AI keeps the same logic &amp; bug). Hints use your original code.</p>';
-}
-
-function seed() {
-  return (Date.now() % 999983 + Math.floor(Math.random() * 1000)) >>> 0;
-}
-
-function setBusy(btn, on, text) {
-  btn.disabled = on;
-  if (on && text) btn.textContent = text;
-}
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s == null ? '' : String(s);
-  return d.innerHTML;
-}
-
-// Execution happens on the Node server (node:vm), because browsers (MV3 CSP)
-// and the free Cloudflare tier can't run the AI-generated reference code. The
-// panel sends the artifact to the server's `run` op and gets back the findings.
-async function runRemoteVerification(artifact) {
-  const s = seed();
-  return callOp({ op: 'run', artifact, seed: s });
-}
-
+/* ---------- tab switching ---------- */
 document.querySelectorAll('.tab').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
@@ -76,129 +73,119 @@ document.querySelectorAll('.tab').forEach((btn) => {
   });
 });
 
+/* ---------- code block: collapse + copy ---------- */
+$('code-toggle').addEventListener('click', () => {
+  const pre = $('code');
+  const open = pre.hidden;
+  pre.hidden = !open;
+  $('code-toggle').firstChild.textContent = (open ? '▾ ' : '▸ ');
+});
+$('code-copy').addEventListener('click', () => copyText(effCode()));
+
+/* ---------- settings ---------- */
 $('btn-settings').addEventListener('click', async () => {
   const active = $('settings').classList.contains('active');
   document.querySelectorAll('.pane, #settings').forEach((p) => p.classList.remove('active'));
-  if (!active) {
-    const cfg = await getConfig();
-    $('cfg-base').value = cfg.workerUrl;
-    $('cfg-token').value = cfg.token;
-    $('settings').classList.add('active');
-  }
+  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+  if (!active) { const cfg = await getConfig(); $('cfg-base').value = cfg.workerUrl; $('cfg-token').value = cfg.token; $('settings').classList.add('active'); }
 });
-
 $('btn-save-cfg').addEventListener('click', async () => {
   await saveConfig({ workerUrl: $('cfg-base').value.trim(), token: $('cfg-token').value.trim() });
-  $('cfg-status').textContent = 'Saved.';
+  $('cfg-status').textContent = 'Saved.'; toast('Settings saved');
   setTimeout(() => ($('cfg-status').textContent = ''), 2000);
 });
 
+/* ---------- Hints ---------- */
 $('btn-hint').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('hint-result');
-  const level = $('hint-level').value;
-  setBusy($('btn-hint'), true, 'Thinking…');
-  out.innerHTML = '<div class="muted">Asking the tutor…</div>';
+  setBusy($('btn-hint'), true);
+  out.innerHTML = '';
+  setStatus('hint-status', 'Asking the tutor…');
   try {
-    const { hint: text } = await callOp({ op: 'hint', problem: effProblem(), code: effCode(), level });
-    out.innerHTML = `<div class="card"><p class="hint">${esc(text)}</p></div>`;
-  } catch (e) {
-    out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
-  } finally {
-    setBusy($('btn-hint'), false, 'Get hint');
-  }
+    const { hint } = await callOp({ op: 'hint', problem: effProblem(), code: effCode(), level: $('hint-level').value });
+    setStatus('hint-status', '');
+    out.innerHTML = `<div class="card"><div class="verdict-title">💡 Hint</div><div class="hint">${md(hint)}</div></div>`;
+  } catch (e) { setStatus('hint-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`; }
+  finally { setBusy($('btn-hint'), false); }
 });
 
-
-// Verify: (1) Worker generates the reference/generator + transcribed user JS,
-// (2) the browser Blob worker runs them & finds the smallest failing input,
-// (3) Worker explains the root cause (only if a failing input was found).
+/* ---------- Verify ---------- */
 $('btn-verify').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('verify-result');
-  setBusy($('btn-verify'), true, 'Working…');
-  out.innerHTML = '<div class="muted">Writing a brute force…</div>';
+  setBusy($('btn-verify'), true);
+  out.innerHTML = '';
+  setStatus('verify-status', 'Writing a brute force…');
+  const t0 = Date.now();
   try {
     const { artifact } = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-    out.innerHTML = '<div class="muted">Running random tests…</div>';
-    const r = await runRemoteVerification(artifact);
+    setStatus('verify-status', 'Running random tests…');
+    const r = await callOp({ op: 'run', artifact, seed: (Date.now() % 999983) >>> 0 });
     let explanation = '';
     if (r.best) {
-      out.innerHTML = '<div class="muted">Found it — asking for the root cause…</div>';
-      const ex = await callOp({
-        op: 'explain',
-        problem: effProblem(),
-        code: effCode(),
-        input: r.best.input,
-        userOutput: r.best.userOutput,
-        userError: r.best.userError,
-        expected: r.best.expected,
-      });
+      setStatus('verify-status', 'Found it — writing the root cause…');
+      const ex = await callOp({ op: 'explain', problem: effProblem(), code: effCode(), input: r.best.input, userOutput: r.best.userOutput, userError: r.best.userError, expected: r.best.expected });
       explanation = ex.explanation || '';
     }
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
     if (r.best) {
       const b = r.best;
       out.innerHTML = `
         <div class="card bug">
           <div class="verdict-title">🐞 Smallest failing input</div>
-          <pre class="codeblock">input:   ${esc(JSON.stringify(b.input))}</pre>
-          <pre class="codeblock bad">yours:   ${esc(b.kind === 'crash' ? 'throws: ' + b.userError : JSON.stringify(b.userOutput))}</pre>
-          <pre class="codeblock good">expected: ${esc(JSON.stringify(b.expected))}</pre>
-          <p class="explain">${esc(explanation)}</p>
+          <div class="kv">
+            <div class="k">input</div><pre class="codeblock">${esc(JSON.stringify(b.input))}</pre>
+            <div class="k">yours</div><pre class="codeblock bad">${esc(b.kind === 'crash' ? 'throws: ' + b.userError : JSON.stringify(b.userOutput))}</pre>
+            <div class="k">expected</div><pre class="codeblock good">${esc(JSON.stringify(b.expected))}</pre>
+          </div>
+          ${explanation ? `<div class="explain-label">ROOT CAUSE</div><div class="explain">${md(explanation)}</div>` : ''}
           ${transcriptionNote()}
         </div>`;
     } else {
-      out.innerHTML = `<div class="card ok"><div class="verdict-title">✅ No counterexample found</div><p class="muted">Matched the brute force on ${r.testsRun} random tests.</p>${transcriptionNote()}</div>`;
+      out.innerHTML = `<div class="card ok"><div class="verdict-title">✅ No counterexample found</div><div class="muted">Matched the brute force on ${r.testsRun} random tests.</div>${transcriptionNote()}</div>`;
     }
-    if (r.bothFailed) out.innerHTML += '<div class="muted note">Note: the reference and your solution both threw on some inputs — results may be inconclusive.</div>';
-  } catch (e) {
-    out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
-  } finally {
-    setBusy($('btn-verify'), false, 'Find counterexample');
-  }
+    if (r.bothFailed) out.innerHTML += '<div class="muted note">⚠️ The reference and your code both threw on some inputs — this result may be inconclusive.</div>';
+    setStatusDone('verify-status', `Done in ${secs}s`);
+  } catch (e) { setStatus('verify-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`; }
+  finally { setBusy($('btn-verify'), false); }
 });
 
+/* ---------- Test cases ---------- */
 $('btn-cases').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('cases-result');
-  setBusy($('btn-cases'), true, 'Generating…');
-  out.innerHTML = '<div class="muted">Writing a generator + reference…</div>';
+  setBusy($('btn-cases'), true);
+  out.innerHTML = '';
+  setStatus('cases-status', 'Writing a generator + reference…');
   try {
     const { artifact } = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
-    out.innerHTML = '<div class="muted">Running tests…</div>';
-    const r = await runRemoteVerification(artifact);
-    if (!r.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; return; }
-    const items = r.testCases.map((tc, i) => `
+    setStatus('cases-status', 'Running tests…');
+    const r = await callOp({ op: 'run', artifact, seed: (Date.now() % 999983) >>> 0 });
+    if (!r.testCases || !r.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; setStatus('cases-status', ''); return; }
+    const items = r.testCases.map((tc, i) => {
+      const payload = 'Input:  ' + JSON.stringify(tc.input) + '\nExpected: ' + JSON.stringify(tc.expected);
+      return `
       <div class="case-item">
-        <div class="muted">#${i + 1} input</div>
-        <pre class="codeblock">${esc(JSON.stringify(tc.input))}</pre>
-        <div class="muted">expected</div>
-        <pre class="codeblock good">${esc(JSON.stringify(tc.expected))}</pre>
-      </div>`).join('');
-    out.innerHTML = `<div class="card"><div class="verdict-title">🧪 Test cases (copy & run locally)</div>${items}${transcriptionNote()}</div>`;
-  } catch (e) {
-    out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
-  } finally {
-    setBusy($('btn-cases'), false, 'Generate test cases');
-  }
+        <div class="case-top"><span class="case-idx">Test #${i + 1}</span><button class="mini" data-copy='${esc(payload).replace(/'/g, '&#39;')}'>⧉ Copy</button></div>
+        <div class="kv">
+          <div class="k">input</div><pre class="codeblock">${esc(JSON.stringify(tc.input))}</pre>
+          <div class="k">expected</div><pre class="codeblock good">${esc(JSON.stringify(tc.expected))}</pre>
+        </div>
+      </div>`;
+    }).join('');
+    out.innerHTML = `<div class="cases-head"><div class="verdict-title" style="margin:0">🧪 Test cases</div><button class="mini" id="copy-all">⧉ Copy all</button></div>${items}${transcriptionNote()}`;
+    out.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.getAttribute('data-copy'))));
+    const all = $('copy-all'); if (all) all.addEventListener('click', () => copyText(r.testCases.map((tc, i) => `#${i + 1} Input: ${JSON.stringify(tc.input)}\n     Expected: ${JSON.stringify(tc.expected)}`).join('\n')));
+    setStatusDone('cases-status', r.testCases.length + ' test cases');
+  } catch (e) { setStatus('cases-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`; }
+  finally { setBusy($('btn-cases'), false); }
 });
 
+/* ---------- manual re-read + keep-alive + auto refresh ---------- */
 $('btn-extract').addEventListener('click', extractFromPage);
-$('btn-manual').addEventListener('click', () => {
-  $('manual-wrap').hidden = !$('manual-wrap').hidden;
-});
-
-// Keep the (free, auto-sleeping) backend warm while the panel is open, so the
-// first click doesn't wait for a cold start.
-async function pingServer() {
-  try {
-    const cfg = await getConfig();
-    if (!cfg.workerUrl) return;
-    await fetch(cfg.workerUrl.replace(/\/$/, '') + '/health', { method: 'GET', cache: 'no-store' });
-  } catch (_) { /* ignore */ }
-}
+async function pingServer() { try { const cfg = await getConfig(); if (!cfg.workerUrl) return; await fetch(cfg.workerUrl.replace(/\/$/, '') + '/health', { method: 'GET', cache: 'no-store' }); } catch (_) {} }
+extractFromPage();
+setInterval(extractFromPage, 1500);
 pingServer();
 setInterval(pingServer, 45000);
-
-extractFromPage();
-

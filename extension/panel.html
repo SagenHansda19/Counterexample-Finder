@@ -12,23 +12,19 @@
         <button id="btn-settings" class="icon" title="Settings">⚙️</button>
       </div>
       <div id="title" class="title">Loading problem…</div>
-      <div id="extract-bar">
-        <button id="btn-extract" class="small">↻ Re-read page</button>
-        <button id="btn-manual" class="small">⌨️ Paste manually</button>
-        <span id="extract-status" class="muted"></span>
+      <div class="syncbar">
+        <span id="sync-dot" class="dot dot-idle"></span>
+        <span id="extract-status" class="muted">Reading page…</span>
+        <button id="btn-extract" class="small">↻ Re-read</button>
       </div>
     </header>
 
-    <div id="manual-wrap" hidden>
-      <div class="code-label">PROBLEM STATEMENT (optional)</div>
-      <textarea id="manual-problem" class="manual-in" rows="4" placeholder="Paste the problem statement if the auto-read failed…"></textarea>
-      <div class="code-label">YOUR CODE (JavaScript)</div>
-      <textarea id="manual-code" class="manual-in" rows="8" placeholder="Paste your JavaScript solution…"></textarea>
-    </div>
-
     <div id="code-wrap">
-      <div class="code-label">YOUR CODE</div>
-      <pre id="code" class="code"></pre>
+      <div class="code-head">
+        <button id="code-toggle" class="code-toggle">▸ <span id="code-count">Your code</span></button>
+        <button id="code-copy" class="mini" title="Copy code">⧉ Copy</button>
+      </div>
+      <pre id="code" class="code" hidden></pre>
     </div>
 
     <nav class="tabs">
@@ -46,26 +42,29 @@
         </select>
         <button id="btn-hint" class="primary">Get hint</button>
       </div>
+      <div id="hint-status" class="status"></div>
       <div id="hint-result" class="out"></div>
     </section>
 
     <section id="tab-verify" class="pane">
-      <button id="btn-verify" class="primary">Find counterexample</button>
+      <button id="btn-verify" class="primary wide">Find counterexample</button>
+      <div id="verify-status" class="status"></div>
       <div id="verify-result" class="out"></div>
     </section>
 
     <section id="tab-cases" class="pane">
-      <button id="btn-cases" class="primary">Generate test cases</button>
+      <button id="btn-cases" class="primary wide">Generate test cases</button>
+      <div id="cases-status" class="status"></div>
       <div id="cases-result" class="out"></div>
     </section>
 
     <section id="settings" class="pane">
       <h2>Settings</h2>
-      <label class="fld"><span>Worker URL</span><input id="cfg-base" /></label>
-      <label class="fld"><span>Shared token</span><input id="cfg-token" type="password" /></label>
+      <label class="fld"><span>Backend URL</span><input id="cfg-base" placeholder="http://localhost:4000" /></label>
+      <label class="fld"><span>Shared token</span><input id="cfg-token" type="password" placeholder="your token" /></label>
       <button id="btn-save-cfg" class="primary">Save</button>
       <div id="cfg-status" class="muted"></div>
-      <p class="muted note">Requests go only to your Worker (never to a public model with your key). Your LeetCode code is not stored anywhere.</p>
+      <p class="muted note">Requests go only to your backend (the model key is kept there). Your LeetCode code is never stored.</p>
     </section>
 
     <script type="module" src="panel.js"></script>
