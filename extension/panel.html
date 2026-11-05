@@ -14,9 +14,17 @@
       <div id="title" class="title">Loading problem…</div>
       <div id="extract-bar">
         <button id="btn-extract" class="small">↻ Re-read page</button>
+        <button id="btn-manual" class="small">⌨️ Paste manually</button>
         <span id="extract-status" class="muted"></span>
       </div>
     </header>
+
+    <div id="manual-wrap" hidden>
+      <div class="code-label">PROBLEM STATEMENT (optional)</div>
+      <textarea id="manual-problem" class="manual-in" rows="4" placeholder="Paste the problem statement if the auto-read failed…"></textarea>
+      <div class="code-label">YOUR CODE (JavaScript)</div>
+      <textarea id="manual-code" class="manual-in" rows="8" placeholder="Paste your JavaScript solution…"></textarea>
+    </div>
 
     <div id="code-wrap">
       <div class="code-label">YOUR CODE</div>

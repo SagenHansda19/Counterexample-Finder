@@ -6,29 +6,44 @@
   window.__cxfInjected = true;
 
   function getEditorCode() {
-    // 1) Legacy CodeMirror (LeetCode used this for a long time).
+    // LeetCode's editor is CodeMirror 6: an editable `div.cm-content`.
+    // Strategy 1 — find every .cm-content, prefer an EDITABLE one (not a
+    // read-only snippet in the problem statement), and return its text.
+    const cmContents = Array.from(document.querySelectorAll('.cm-content'));
+    let fallback = '';
+    for (const el of cmContents) {
+      const editor = el.closest('.cm-editor');
+      const readOnly = editor && editor.classList.contains('cm-readonly');
+      const text = (el.innerText || el.textContent || '').trim();
+      if (text) {
+        if (el.isContentEditable && !readOnly) return text;
+        if (!readOnly && text.length > fallback.length) fallback = text;
+      }
+    }
+    if (fallback) return fallback;
+    // Strategy 2 — legacy CodeMirror 5.
     try {
-      const cmEl = document.querySelector('.CodeMirror');
-      if (cmEl && cmEl.CodeMirror) return cmEl.CodeMirror.getValue();
+      const cm = document.querySelector('.CodeMirror');
+      if (cm && cm.CodeMirror) return cm.CodeMirror.getValue();
     } catch (e) {}
-    // 2) Monaco editor (newer LeetCode editor).
+    // Strategy 3 — Monaco.
     try {
       if (window.monaco && window.monaco.editor) {
         const models = window.monaco.editor.getModels();
         if (models && models.length) return models[0].getValue();
       }
     } catch (e) {}
-    // 3) CodeMirror 6 content (aria) fallback.
+    // Strategy 4 — plain textarea.
     try {
-      const cm6 = document.querySelector('.cm-content');
-      if (cm6) return cm6.textContent || '';
+      const ta = document.querySelector('textarea[name="editor"], textarea.CodeMirror-textfield, textarea');
+      if (ta && ta.value) return ta.value;
     } catch (e) {}
     return '';
   }
 
   function detectLang() {
     try {
-      const el = document.querySelector('[class*="language-selector"], .editor-tab');
+      const el = document.querySelector('[class*="language-selector"], .editor-tab, .language-tab');
       if (el) {
         const t = (el.textContent || '').trim().toLowerCase();
         if (t.includes('python')) return 'python';
@@ -36,6 +51,10 @@
         if (t.includes('c++') || t.includes('cpp')) return 'cpp';
         if (t.includes('javascript') || t.includes('js') || t.includes('ts')) return 'javascript';
       }
+      // Secondary signal: the code itself looks like C++/Python.
+      const code = getEditorCode();
+      if (/\b(vector<int>|public:|std::|#include|class Solution)\b/.test(code)) return 'cpp';
+      if (/^\s*def \w+\(.*\):\s*$/.test(code) && !code.includes('function')) return 'python';
     } catch (e) {}
     return 'javascript';
   }
@@ -44,17 +63,24 @@
     let title = '';
     let statement = '';
     try {
-      const t = document.querySelector('.problem-header h1, .problem-header .question-name');
+      const t =
+        document.querySelector('#question-title') ||
+        document.querySelector('.problem-header h1, .problem-header .question-name, .question-card-title');
       title = t ? t.textContent.trim() : document.title.replace(/^.*?\|/i, '').trim();
     } catch (e) {}
     try {
-      const c = document.querySelector('.question-content, [class*="problem-statement"]');
+      // `.question-content` holds the full statement + examples.
+      const c =
+        document.querySelector('.question-content') ||
+        document.querySelector('[class*="problem-statement"]') ||
+        document.querySelector('.topic-card');
       statement = c ? c.innerText.trim() : '';
     } catch (e) {}
+    const code = getEditorCode();
     return {
       title,
-      statement: statement.slice(0, 6000),
-      code: getEditorCode(),
+      statement: statement.slice(0, 8000),
+      code,
       lang: detectLang(),
       url: location.href,
     };

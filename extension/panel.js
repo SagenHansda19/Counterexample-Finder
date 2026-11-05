@@ -21,12 +21,28 @@ async function extractFromPage() {
   }
 }
 
+function effProblem() {
+  const m = $('manual-problem').value.trim();
+  return m || pageData.statement || pageData.title || '';
+}
+function effCode() {
+  const m = $('manual-code').value.trim();
+  return m || pageData.code || '';
+}
 function needCode() {
-  if (!pageData.code) {
-    alert('No code detected. Open a LeetCode problem with your solution in the editor, then click "Re-read page".');
+  if (!effCode()) {
+    alert('No code detected. Re-read the page, or click "Paste manually" and paste your JavaScript solution.');
     return false;
   }
   return true;
+}
+// Verify/Test-Cases run your code in the browser via JavaScript only.
+function langGuard() {
+  if ($('manual-code').value.trim()) return null; // manual paste is assumed JS
+  if (pageData.lang && pageData.lang !== 'javascript') {
+    return 'Counterexample verification runs in your browser via <b>JavaScript</b>. Switch your LeetCode editor to <b>JavaScript</b> and click "Re-read page" (or paste your JS solution with "Paste manually"). <i>Hints work in any language.</i>';
+  }
+  return null;
 }
 
 function seed() {
@@ -77,7 +93,7 @@ $('btn-hint').addEventListener('click', async () => {
   setBusy($('btn-hint'), true, 'Thinking…');
   out.innerHTML = '<div class="muted">Asking the tutor…</div>';
   try {
-    const { hint: text } = await callOp({ op: 'hint', problem: pageData.statement || pageData.title, code: pageData.code, level });
+    const { hint: text } = await callOp({ op: 'hint', problem: effProblem(), code: effCode(), level });
     out.innerHTML = `<div class="card"><p class="hint">${esc(text)}</p></div>`;
   } catch (e) {
     out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`;
@@ -101,13 +117,15 @@ async function runWorker(userCode, artifact, s, onProgress) {
 }
 
 async function getArtifact() {
-  const r = await callOp({ op: 'generate', problem: pageData.statement || pageData.title, code: pageData.code });
+  const r = await callOp({ op: 'generate', problem: effProblem(), code: effCode() });
   return r.artifact;
 }
 
 $('btn-verify').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('verify-result');
+  const guard = langGuard();
+  if (guard) { out.innerHTML = `<div class="card bug"><div class="verdict-title">ℹ️ JavaScript required</div><p class="explain">${guard}</p></div>`; return; }
   setBusy($('btn-verify'), true, 'Working…');
   out.innerHTML = '<div class="muted">1/2 Writing a brute force…</div>';
   let s;
@@ -115,15 +133,15 @@ $('btn-verify').addEventListener('click', async () => {
     const artifact = await getArtifact();
     out.innerHTML = '<div class="muted">2/2 Running random tests in your browser…</div>';
     s = seed();
-    const wr = await runWorker(pageData.code, artifact, s, (d, t) => {
+    const wr = await runWorker(effCode(), artifact, s, (d, t) => {
       out.innerHTML = `<div class="muted">Running… ${Math.round((d / t) * 100)}%</div>`;
     });
     if (wr.best) {
       out.innerHTML = `<div class="muted">Explaining root cause…</div>`;
       const { explanation: text } = await callOp({
         op: 'explain',
-        problem: pageData.statement || pageData.title,
-        code: pageData.code,
+        problem: effProblem(),
+        code: effCode(),
         input: wr.best.input,
         userOutput: wr.best.userOutput,
         userError: wr.best.userError,
@@ -151,11 +169,13 @@ $('btn-verify').addEventListener('click', async () => {
 $('btn-cases').addEventListener('click', async () => {
   if (!needCode()) return;
   const out = $('cases-result');
+  const guard = langGuard();
+  if (guard) { out.innerHTML = `<div class="card bug"><div class="verdict-title">ℹ️ JavaScript required</div><p class="explain">${guard}</p></div>`; return; }
   setBusy($('btn-cases'), true, 'Generating…');
   out.innerHTML = '<div class="muted">Building generator + reference…</div>';
   try {
     const artifact = await getArtifact();
-    const wr = await runWorker(pageData.code, artifact, seed(), () => {});
+    const wr = await runWorker(effCode(), artifact, seed(), () => {});
     if (!wr.testCases.length) { out.innerHTML = '<div class="muted">No test cases produced.</div>'; return; }
     const items = wr.testCases.map((tc, i) => `
       <div class="case-item">
@@ -173,5 +193,8 @@ $('btn-cases').addEventListener('click', async () => {
 });
 
 $('btn-extract').addEventListener('click', extractFromPage);
+$('btn-manual').addEventListener('click', () => {
+  $('manual-wrap').hidden = !$('manual-wrap').hidden;
+});
 extractFromPage();
 
