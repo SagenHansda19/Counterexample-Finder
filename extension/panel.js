@@ -139,7 +139,7 @@ $('btn-hint').addEventListener('click', async () => {
     const { hint } = await callOp({ op: 'hint', problem: effProblem(), code: effCode(), level: $('hint-level').value });
     setStatus('hint-status', '');
     out.innerHTML = `<div class="card"><div class="verdict-title">💡 Hint</div><div class="hint">${md(hint)}</div></div>`;
-  } catch (e) { setStatus('hint-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`; }
+  } catch (e) { console.error('[cxf hint]', e); setStatus('hint-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div><div class="muted">Open the panel DevTools (right-click → Inspect → Console) for the full error.</div></div>`; }
   finally { setBusy($('btn-hint'), false); }
 });
 
@@ -195,7 +195,7 @@ $('btn-verify').addEventListener('click', async () => {
     }
     if (r.bothFailed) out.innerHTML += '<div class="muted note">⚠️ The reference and your code both threw on some inputs — this result may be inconclusive.</div>';
     setStatusDone('verify-status', `Done in ${secs}s`);
-  } catch (e) { setStatus('verify-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div></div>`; }
+  } catch (e) { console.error('[cxf verify]', e); setStatus('verify-status', ''); out.innerHTML = `<div class="card bug"><div class="verdict-title">⚠️ ${esc(e.message)}</div><div class="muted">Open the panel DevTools (right-click → Inspect → Console) for the full error.</div></div>`; }
   finally { setBusy($('btn-verify'), false); }
 });
 
