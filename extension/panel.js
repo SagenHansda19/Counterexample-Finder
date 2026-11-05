@@ -9,14 +9,15 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s == 
 function splitRow(line) { return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()); }
 function md(s) {
   if (!s) return '';
-  const lines = String(s).split('\n');
+  try { return mdRich(String(s)); }
+  catch (e) { console.warn('[cxf] markdown fallback:', e && e.message); return '<div class="md-p">' + esc(String(s)).replace(/\n/g, '<br>') + '</div>'; }
+}
+function mdRich(s) {
+  const lines = s.split('\n');
   let html = '', i = 0;
   let inList = false;
   const closeList = () => { if (inList) { html += '</div>'; inList = false; } };
-  const inline = (t) => esc(t)
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  const inline = (t) => { try { return esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>').replace(/`([^`]+)`/g, '<code>$1</code>'); } catch (e) { return esc(t); } };
   while (i < lines.length) {
     const raw = lines[i];
     // fenced code block
