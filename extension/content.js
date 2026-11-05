@@ -25,25 +25,29 @@
       if (key > bestKey) { bestKey = key; best = c; }
     }
     if (!best) return '';
-    const lineEls = Array.from(best.querySelectorAll('.view-line'));
-    const items = lineEls.map((el) => {
-      let y = 0;
-      const tr = el.style && el.style.transform;
+    // Position signal: Monaco on LeetCode sets `top` per line (8,26,44,…).
+    // `transform` is empty, so prefer `top`, fall back to offsetTop/transform.
+    const linePos = (el) => {
+      const st = el.style ? el.style.top : null;
+      if (st) { const p = parseFloat(st); if (!isNaN(p)) return p; }
+      if (typeof el.offsetTop === 'number') return el.offsetTop;
+      const tr = el.style ? el.style.transform : null;
       if (tr) {
         const tm =
           tr.match(/translate\([^,]+,\s*([-\d.]+)px/) ||
           tr.match(/translate3d\([^,]+,\s*([-\d.]+)px/) ||
-          tr.match(/translateY\(\s*([-\d.]+)px/) ||
           tr.match(/matrix\([^)]*?,\s*([-\d.]+)\)/);
-        if (tm) y = parseFloat(tm[1]);
+        if (tm) return parseFloat(tm[1]);
       }
-      return { y, text: el.textContent || '' };
-    });
-    items.sort((a, b) => a.y - b.y);
+      return 0;
+    };
+    const lineEls = Array.from(best.querySelectorAll('.view-line'));
+    const items = lineEls.map((el) => ({ pos: linePos(el), text: el.textContent || '' }));
+    items.sort((a, b) => a.pos - b.pos);
     const out = [];
     for (const it of items) {
       const last = out[out.length - 1];
-      if (last && Math.abs(last.y - it.y) < 1 && last.text === it.text) continue; // stale dupe
+      if (last && Math.abs(last.pos - it.pos) < 1 && last.text === it.text) continue; // stale dupe
       out.push(it);
     }
     return out.map((o) => o.text).join('\n');
