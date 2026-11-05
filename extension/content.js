@@ -5,27 +5,67 @@
   if (window.__cxfInjected) return;
   window.__cxfInjected = true;
 
+  function readMonacoDom() {
+    // Read the visible Monaco lines, but do it ROBUSTLY against virtualization:
+    // pick the container with the most lines (the solution editor, not the small
+    // example-input box), sort lines by their vertical offset, and drop stale
+    // duplicate nodes that Monaco can keep around after an edit.
+    const containers = Array.from(document.querySelectorAll('.view-lines'));
+    if (!containers.length) return '';
+    let best = null;
+    let bestKey = -1;
+    for (const c of containers) {
+      const lines = c.querySelectorAll('.view-line');
+      let text = '';
+      try { text = c.textContent || ''; } catch (e) {}
+      // Prefer a container that clearly looks like solution code, else the largest.
+      const looksLikeCode =
+        /class\s+Solution|def\s+\w+\(|function\s+\w+\(|#include\s|import\s|=>/.test(text);
+      const key = lines.length * 2 + (looksLikeCode ? 100000 : 0);
+      if (key > bestKey) { bestKey = key; best = c; }
+    }
+    if (!best) return '';
+    const lineEls = Array.from(best.querySelectorAll('.view-line'));
+    const items = lineEls.map((el) => {
+      let y = 0;
+      const tr = el.style && el.style.transform;
+      if (tr) {
+        const tm = tr.match(/translate\([^,]+,\s*([-\d.]+)px\)/) || tr.match(/matrix\([^)]*\,\s*([-\d.]+)\)/);
+        if (tm) y = parseFloat(tm[1]);
+      }
+      return { y, text: el.textContent || '' };
+    });
+    items.sort((a, b) => a.y - b.y);
+    const out = [];
+    for (const it of items) {
+      const last = out[out.length - 1];
+      if (last && Math.abs(last.y - it.y) < 1 && last.text === it.text) continue; // stale dupe
+      out.push(it);
+    }
+    return out.map((o) => o.text).join('\n');
+  }
+
   function getEditorCode() {
     // Strategy 1 — Monaco API: reads the FULL model value, immune to scroll
     // virtualization (scraping .view-line misses off-screen lines).
     try {
       if (window.monaco && window.monaco.editor) {
         const eds = window.monaco.editor.getEditors ? window.monaco.editor.getEditors() : [];
+        let best = '';
         for (const ed of eds) {
-          try { const v = ed && ed.getValue && ed.getValue(); if (v && v.trim()) return v; } catch (e) {}
+          try { const v = ed && ed.getValue && ed.getValue(); if (v && v.trim().length > best.length) best = v; } catch (e) {}
         }
+        if (best.trim()) return best;
         const models = window.monaco.editor.getModels ? window.monaco.editor.getModels() : [];
         for (const m of models) {
-          try { const v = m && m.getValue && m.getValue(); if (v && v.trim()) return v; } catch (e) {}
+          try { const v = m && m.getValue && m.getValue(); if (v && v.trim().length > best.length) best = v; } catch (e) {}
         }
+        if (best.trim()) return best;
       }
     } catch (e) {}
-    // Strategy 2 — DOM scrape of rendered lines (fallback when Monaco API absent).
-    const lines = Array.from(document.querySelectorAll('.view-lines .view-line'));
-    if (lines.length) {
-      const text = lines.map((el) => el.textContent || '').join('\n');
-      if (text.trim()) return text;
-    }
+    // Strategy 2 — robust DOM scrape of the Monaco view (handles virtualization).
+    const dom = readMonacoDom();
+    if (dom.trim()) return dom;
     // Strategy 3 — CodeMirror 6: editable .cm-content (skip read-only snippets).
     const cmContents = Array.from(document.querySelectorAll('.cm-content'));
     let fallback = '';

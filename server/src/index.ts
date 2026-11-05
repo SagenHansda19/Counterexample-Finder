@@ -168,7 +168,8 @@ async function opHandler(req: Request, res: Response) {
         GUARD +
         '\n\nYou are a Socratic competitive-programming tutor. STRICT: NEVER write the full solution or a complete solution function; guide the student to it themselves. Output ONLY: 1) REFRAME, 2) HINT, 3) COMPLEXITY, 4) EDGE CASES. Level: ' +
         body.level +
-        ' ("nudge"=light, "approach"=may name the data structure, "debug"=point at the buggy line/region in words, do NOT rewrite it).';
+        ' ("nudge"=light, "approach"=may name the data structure, "debug"=point at the buggy line/region in words, do NOT rewrite it). ' +
+        'Use the problem\'s ACTUAL parameter names (from the CODE signature) whenever you give an example input — e.g. `nums = [3, 3], target = 6` — not bare arrays. Keep examples short (2-4).';
       const raw = await client.complete({ system: sys, user: sb('PROBLEM', problem) + '\n\n' + sb('CODE', code) + '\n\nGive hints only.', maxOutputTokens: 900, temperature: 0.4 });
       return res.json({ hint: raw });
     }
