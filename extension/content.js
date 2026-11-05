@@ -6,9 +6,21 @@
   window.__cxfInjected = true;
 
   function getEditorCode() {
-    // LeetCode's editor is CodeMirror 6: an editable `div.cm-content`.
-    // Strategy 1 — find every .cm-content, prefer an EDITABLE one (not a
-    // read-only snippet in the problem statement), and return its text.
+    // Strategy 1 — Monaco (current LeetCode). Each line is a `.view-line`
+    // inside `.view-lines`; concatenate their text.
+    const lines = Array.from(document.querySelectorAll('.view-lines .view-line'));
+    if (lines.length) {
+      const text = lines.map((el) => el.textContent || '').join('\n');
+      if (text.trim()) return text;
+    }
+    // Strategy 2 — Monaco via global (if exposed).
+    try {
+      if (window.monaco && window.monaco.editor) {
+        const models = window.monaco.editor.getModels();
+        if (models && models.length) return models[0].getValue();
+      }
+    } catch (e) {}
+    // Strategy 3 — CodeMirror 6: editable .cm-content (skip read-only snippets).
     const cmContents = Array.from(document.querySelectorAll('.cm-content'));
     let fallback = '';
     for (const el of cmContents) {
@@ -21,19 +33,12 @@
       }
     }
     if (fallback) return fallback;
-    // Strategy 2 — legacy CodeMirror 5.
+    // Strategy 4 — legacy CodeMirror 5.
     try {
       const cm = document.querySelector('.CodeMirror');
       if (cm && cm.CodeMirror) return cm.CodeMirror.getValue();
     } catch (e) {}
-    // Strategy 3 — Monaco.
-    try {
-      if (window.monaco && window.monaco.editor) {
-        const models = window.monaco.editor.getModels();
-        if (models && models.length) return models[0].getValue();
-      }
-    } catch (e) {}
-    // Strategy 4 — plain textarea.
+    // Strategy 5 — plain textarea.
     try {
       const ta = document.querySelector('textarea[name="editor"], textarea.CodeMirror-textfield, textarea');
       if (ta && ta.value) return ta.value;
@@ -64,13 +69,15 @@
     let statement = '';
     try {
       const t =
+        document.querySelector('[data-e2e-locator="question-title"]') ||
         document.querySelector('#question-title') ||
         document.querySelector('.problem-header h1, .problem-header .question-name, .question-card-title');
       title = t ? t.textContent.trim() : document.title.replace(/^.*?\|/i, '').trim();
     } catch (e) {}
     try {
-      // `.question-content` holds the full statement + examples.
+      // `[data-qd-rendered-description]` holds the full statement + examples + constraints.
       const c =
+        document.querySelector('[data-qd-rendered-description]') ||
         document.querySelector('.question-content') ||
         document.querySelector('[class*="problem-statement"]') ||
         document.querySelector('.topic-card');
