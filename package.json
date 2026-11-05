@@ -1,0 +1,16 @@
+{
+  "name": "counterexample-finder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Counterexample Finder — find the smallest failing input for any buggy competitive-programming / LeetCode solution. AI writes a brute-force + random tests, the browser verifies.",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix app install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:app": "npm --prefix app run dev",
+    "dev": "npm --prefix server run dev & npm --prefix app run dev",
+    "build": "npm --prefix server run build && npm --prefix app run build",
+    "start": "npm --prefix server run start",
+    "eval": "node evals/run.js"
+  },
+  "license": "MIT"
+}
