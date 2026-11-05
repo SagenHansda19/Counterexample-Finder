@@ -31,7 +31,12 @@ function setBusy(btn, on) { btn.disabled = on; }
 function toast(msg) { let t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); clearTimeout(t._to); t._to = setTimeout(() => t.classList.remove('show'), 1600); }
 async function copyText(text) { try { await navigator.clipboard.writeText(text); } catch (e) { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } toast('Copied to clipboard'); }
 
-function effProblem() { return pageData.statement || pageData.title || ''; }
+function effProblem() {
+  const t = (pageData.title || '').trim();
+  const s = (pageData.statement || '').trim();
+  if (t && s) return t + '\n\n' + s;
+  return s || t || '';
+}
 function effCode() { return pageData.code || ''; }
 function needCode() { if (!effCode()) { setStatus('verify-status', ''); toast('No code detected — write some in the LeetCode editor'); return false; } return true; }
 function transcriptionNote() { const raw = effCode(); if (/function\s*\w*\s*\(|=>/.test(raw)) return ''; return '<div class="muted note">⚠️ Your solution was auto-transcribed to JavaScript for this check (same logic &amp; bug kept).</div>'; }

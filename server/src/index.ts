@@ -113,6 +113,7 @@ function artifactFromBody(body: any): Artifact | null {
     bruteForceCode: a.bruteForceCode,
     generatorCode: a.generatorCode,
     userJs: a.userJs,
+    normalizeCode: typeof a.normalizeCode === 'string' ? a.normalizeCode : undefined,
     maxInputSize: Number(a.maxInputSize) || 8,
     testCount: Number(a.testCount) || 60,
   };

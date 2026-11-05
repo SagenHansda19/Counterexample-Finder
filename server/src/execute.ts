@@ -11,6 +11,7 @@ export interface Artifact {
   bruteForceCode: string;
   generatorCode: string;
   userJs: string;
+  normalizeCode?: string;
   maxInputSize: number;
   testCount: number;
 }
@@ -35,12 +36,13 @@ const HARNESS_HEAD = `
   function mulberry32(sd){let s=sd>>>0;return function(){s+=0x6d2b79f5;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
   function deepEqual(a,b){if(Object.is(a,b))return true;if(Array.isArray(a)&&Array.isArray(b)){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!deepEqual(a[i],b[i]))return false;return true;}if(a&&b&&typeof a==="object"&&typeof b==="object"){const ka=Object.keys(a),kb=Object.keys(b);if(ka.length!==kb.length)return false;for(const k of ka)if(!Object.prototype.hasOwnProperty.call(b,k)||!deepEqual(a[k],b[k]))return false;return true;}return false;}
   function sizeMetric(args){let tot=0;const w=v=>{if(Array.isArray(v)){tot+=v.length;v.forEach(w);}else if(v&&typeof v==="object")Object.values(v).forEach(w);else if(typeof v==="number")tot+=Math.abs(v);else tot+=1;};args.forEach(w);return tot;}
-  function classify(res,args){if(!res.userErr&&!res.bruteErr){if(!deepEqual(res.userOut,res.bruteOut))return{kind:"mismatch",input:args,userOutput:res.userOut,expected:res.bruteOut,sizeMetric:sizeMetric(args)};return null;}if(res.userErr&&!res.bruteErr)return{kind:"crash",input:args,userError:res.userErr,expected:res.bruteOut,sizeMetric:sizeMetric(args)};return null;}
+  function classify(res,args){ if(!res.userErr&&!res.bruteErr){ if(!deepEqual(__canon(res.userOut,args), __canon(res.bruteOut,args))) return{kind:"mismatch",input:args,userOutput:res.userOut,expected:res.bruteOut,sizeMetric:sizeMetric(args)};return null;}if(res.userErr&&!res.bruteErr)return{kind:"crash",input:args,userError:res.userErr,expected:res.bruteOut,sizeMetric:sizeMetric(args)};return null;}
   function pickBest(f){let b=null;for(const x of f)if(!b||x.sizeMetric<b.sizeMetric)b=x;return b;}
   function shrinkSearch(best,run){let cur=best;let budget=90;let improved=true;while(improved&&budget>0){improved=false;for(let idx=0;idx<cur.input.length&&budget>0;idx++){const item=cur.input[idx];if(!Array.isArray(item))continue;for(let len=item.length-1;len>=0&&budget>0;len--){budget--;const c=cur.input.slice();c[idx]=item.slice(0,len);const f=classify(run(c),c);if(f&&f.sizeMetric<cur.sizeMetric){cur=f;improved=true;break;}}}}return cur;}
   `;
 
 const HARNESS_TAIL = `
+  const __canon = (typeof canon === 'function') ? function (x, i) { try { return canon(x, i); } catch (e) { return x; } } : function (x) { return x; };
   const __user = __ENTRY__;
   const __brute = bruteForce;
   const __make = makeInput;
@@ -71,6 +73,7 @@ export function runArtifact(artifact: Artifact, seed: number, timeoutMs = 5000):
     artifact.bruteForceCode +
     '\n' +
     artifact.generatorCode +
+    (artifact.normalizeCode ? '\n' + artifact.normalizeCode : '') +
     '\n' +
     HARNESS_TAIL
       .replace(/__ENTRY__/g, artifact.entryName)

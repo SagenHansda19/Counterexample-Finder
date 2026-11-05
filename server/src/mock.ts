@@ -36,6 +36,11 @@ export function mockGenerate(): { artifact: GenerateResult; mock: true } {
   const target = nums[0] + nums[1];
   return [nums, target];
 }`,
+      normalizeCode: `function canon(output, input) {
+  if (output == null) return null;
+  if (Array.isArray(output)) return output.slice().sort((a, b) => a - b);
+  return output;
+}`,
       maxInputSize: 10,
       testCount: 40,
     },
