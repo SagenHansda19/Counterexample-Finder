@@ -7,10 +7,11 @@
 
 const DEFAULTS = {
   // The backend (Node service on Render). It holds the API key (private),
-  // enforces the guardrail, and runs the code (node:vm). The shared token must
-  // match the CXF_TOKEN env var set on Render.
+  // enforces the guardrail, and runs the code (node:vm). Enter the shared
+  // token (matches the CXF_TOKEN env var on Render) once in the panel Settings
+  // (⚙️); it is intentionally NOT committed to this repo.
   workerUrl: 'https://counterexample-finder.onrender.com',
-  token: 'cef7f3a92d41b8e65c0a9347d2e8f160',
+  token: '',
 };
 
 export async function getConfig() {

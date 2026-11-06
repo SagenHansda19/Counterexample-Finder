@@ -21,5 +21,5 @@ services:
       - key: BHARATCODE_BASE_URL
         value: https://api.prod.adaptionlabs.ai/api/v1
       - key: CXF_TOKEN
-        value: cef7f3a92d41b8e65c0a9347d2e8f160
+        value: set_in_render_dashboard
         sync: false
